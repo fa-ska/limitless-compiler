@@ -103,6 +103,8 @@ jobs:
       run: |
          mkdir out -p -v
          cd kernel-dir
+         export KBUILD_BUILD_USER="linex"
+         export KBUILD_BUILD_HOST="project"
          export PATH=$HOME/clang/bin:$HOME/gcc-64/bin:$HOME/gcc-32:$PATH
          COMMAND="make -j$(nproc --all) ${{ inputs.kernel-config }} ARCH=arm64 O=../out all"
          COMMAND+=" ${{ inputs.command }}"
