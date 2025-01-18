@@ -45,7 +45,7 @@ on:
         type: string
         
 jobs:
-  linex-compiler-v1.0ub:
+  linex-compiler-v1:
     runs-on: ${{ inputs.ubuntu }}
     steps:
     - name: Checkin
