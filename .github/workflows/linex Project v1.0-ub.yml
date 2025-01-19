@@ -1,5 +1,5 @@
 # linex Project
-name: linex Project v1.0-ub
+name: linex Project v1.1-ub
 on:
   workflow_dispatch:
     inputs:
@@ -15,7 +15,7 @@ on:
         type: string
       compiler:
         description: 'Compiler | gcc|clang|llvm '
-        default: 'clang'
+        default: 'gcc'
         required: true
         type: string
       kernel-url:
@@ -38,6 +38,11 @@ on:
         default: 'curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s v0.7.6'
         required: true
         type: string
+      command:
+        description: 'Command+'
+        default: 'false'
+        required: true
+        type: string
       any-kernel3:
         description: 'Any-Kernel3'
         default: 'https://github.com/osm0sis/AnyKernel3'
@@ -57,6 +62,7 @@ jobs:
          echo "kernel-branch: ${{ inputs.kernel-branch }}"
          echo "kernel-config: ${{ inputs.kernel-config }}"
          echo "kernelsu: ${{ inputs.kernelsu }}"
+         echo "command+: ${{ inputs.command }}"
          echo "any-kernel3: ${{ inputs.any-kernel3 }}"
          echo "linex Project"
     - name: Checkout
@@ -64,14 +70,7 @@ jobs:
     - name: Setup
       run: |
          sudo apt-get update
-         sudo apt-get install --no-install-recommends -y binutils binutils-aarch64-linux-gnu binutils-arm-linux-gnueabi git ccache automake flex lzop bison gperf build-essential zip curl zlib1g-dev g++-multilib libxml2-utils bzip2 libbz2-dev libbz2-1.0 libghc-bzlib-dev squashfs-tools pngcrush schedtool dpkg-dev liblz4-tool make optipng maven libssl-dev pwgen libswitch-perl policycoreutils minicom libxml-sax-base-perl libxml-simple-perl bc libc6-dev-i386 libx11-dev lib32z-dev libgl1-mesa-dev xsltproc unzip device-tree-compiler python3 aria2
-         if [ ${{ inputs.compiler }} == gcc ]; then
-             sudo apt-get install --no-install-recommends -y clang gcc gcc-arm-linux-gnueabi gcc-aarch64-linux-gnu libffi-dev libncurses5-dev libreadline-dev libsqlite3-dev pigz libarchive-tools software-properties-common openssl ssh wget nano ca-certificates zstd
-         fi
-         if [ ${{ inputs.compiler }} == llvm ]; then
-             sudo apt-get install --no-install-recommends -y clang gcc gcc-arm-linux-gnueabi gcc-aarch64-linux-gnu libffi-dev libncurses5-dev libreadline-dev libsqlite3-dev pigz libarchive-tools software-properties-common openssl ssh wget nano ca-certificates zstd
-             sudo apt-get install --no-install-recommends -y cpio lld llvm g++-aarch64-linux-gnu libelf-dev neofetch
-         fi
+         sudo apt-get install --no-install-recommends -y binutils binutils-aarch64-linux-gnu binutils-arm-linux-gnueabi git ccache automake flex lzop bison gperf build-essential zip curl zlib1g-dev g++-multilib libxml2-utils bzip2 libbz2-dev libbz2-1.0 libghc-bzlib-dev squashfs-tools pngcrush schedtool dpkg-dev liblz4-tool make optipng maven libssl-dev pwgen libswitch-perl policycoreutils minicom libxml-sax-base-perl libxml-simple-perl bc libc6-dev-i386 libx11-dev lib32z-dev libgl1-mesa-dev xsltproc unzip device-tree-compiler python3 aria2 clang gcc gcc-arm-linux-gnueabi gcc-aarch64-linux-gnu libffi-dev libncurses5-dev libreadline-dev libsqlite3-dev pigz libarchive-tools software-properties-common openssl ssh wget nano ca-certificates zstd lld llvm g++-aarch64-linux-gnu libelf-dev neofetch
     - name: Setup Kernel
       run: |
          git clone --depth=1 ${{ inputs.kernel-url }} -b ${{ inputs.kernel-branch }} kernel-dir
@@ -91,19 +90,17 @@ jobs:
          export KBUILD_BUILD_USER="linex"
          export KBUILD_BUILD_HOST="project"
          COMMAND="make -j$(nproc --all) ${{ inputs.kernel-config }} ARCH=arm64 O=../out all"
+         COMMAND+=" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CROSS_COMPILE_COMPAT=arm-linux-gnueabi-"
          if [ ${{ inputs.compiler }} == clang ]; then
-            COMMAND+=" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CROSS_COMPILE_COMPAT=arm-linux-gnueabi-"
             COMMAND+=" CC=clang"
-         fi
-         if [ ${{ inputs.compiler }} == gcc ]; then
-            COMMAND+=" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CROSS_COMPILE_COMPAT=arm-linux-gnueabi-"
-         fi
-         if [ ${{ inputs.compiler }} == llvm ]; then
-            COMMAND+=" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CROSS_COMPILE_COMPAT=arm-linux-gnueabi-"
+         elif [ ${{ inputs.compiler }} == llvm ]; then
             COMMAND+=" CC=clang"
             COMMAND+=" LLVM=1"
-            # COMMAND+=" LLVM_IAS=1"
+            COMMAND+=" LLVM_IAS=0"
             COMMAND+=" AR=llvm-ar NM=llvm-nm STRIP=llvm-strip OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump READELF=llvm-readelf HOSTCC=clang HOSTCXX=clang++ HOSTAR=llvm-ar"
+         fi
+         if [ ${{ inputs.command }} != false ]; then
+            COMMAND+=" ${{ inputs.command }}"
          fi
          ${COMMAND}
     - name: AnyKernel3
