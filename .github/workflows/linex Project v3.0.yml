@@ -206,7 +206,7 @@ jobs:
             export PATH=$HOME/clang/bin:$HOME/gcc-64/bin:$HOME/gcc-32:$PATH
          fi
          export KBUILD_BUILD_USER="linex"
-         export KBUILD_BUILD_HOST="project"
+         export KBUILD_BUILD_HOST="fa_ska"
          export SUBLEVEL=$(cat Makefile | grep "PATCHLEVEL =" | awk '{print $3}')
          if [ ${{ inputs.aosp-clang }} == false ]; then
                 COMMAND+=" CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CROSS_COMPILE_COMPAT=arm-linux-gnueabi-"
