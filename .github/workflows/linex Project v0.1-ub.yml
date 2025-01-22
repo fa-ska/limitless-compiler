@@ -24,7 +24,7 @@ jobs:
          curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s v0.7.6
          export KBUILD_BUILD_USER="linex"
          export KBUILD_BUILD_HOST="project"
-         make -j$(nproc --all) xi_defconfig ARCH=arm64 O=out all CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
+         make -j$(nproc --all) xi_defconfig ARCH=arm64 O=../out all CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
     - name: AnyKernel3
       run: |
           git clone ${{ inputs.any-kernel3 }} AnyKernel3
