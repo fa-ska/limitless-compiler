@@ -27,7 +27,7 @@ jobs:
          make -j$(nproc --all) xi_defconfig ARCH=arm64 O=../out all CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
     - name: AnyKernel3
       run: |
-          git clone ${{ inputs.any-kernel3 }} AnyKernel3
+          git clone https://github.com/osm0sis/AnyKernel3 AnyKernel3
           rm -rf AnyKernel3/.git AnyKernel3/.github AnyKernel3/LICENSE AnyKernel3/README.md AnyKernel3/modules AnyKernel3/patch AnyKernel3/ramdisk
           
           if [[ -f out/arch/arm64/boot/Image.gz-dtb ]]; then
@@ -49,7 +49,7 @@ jobs:
     - id: Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: "${{ inputs.name }}"
+        name: "4.9-kernel"
         path: Upload/*
     
 # Enjoy Your Life....
