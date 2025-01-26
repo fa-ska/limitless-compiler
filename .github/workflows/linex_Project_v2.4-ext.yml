@@ -10,7 +10,7 @@ on:
         type: string
       name:
         description: 'Name'
-        default: '4.9-kernel'
+        default: 'Attitude-'
         required: true
         type: string
       compiler:
@@ -25,22 +25,22 @@ on:
         type: string
       kernel-url:
         description: 'Kernel-url'
-        default: 'https://github.com/linex-17/Limitless.git'
+        default: ''
         required: true
         type: string
       kernel-branch:
         description: 'Kernel-branch'
-        default: 'main'
+        default: ''
         required: true
         type: string
       kernel-config:
         description: 'Kernel-config'
-        default: 'xi_defconfig'
+        default: ''
         required: true
         type: string
       kernelsu:
         description: 'KernelSU | false for disable'
-        default: 'curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s v0.7.6'
+        default: 'curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s v0.9.5'
         required: true
         type: string
       disable-lto:
@@ -50,7 +50,7 @@ on:
         type: string
       AK3:
         description: 'AnyKernel3'
-        default: 'https://github.com/osm0sis/AnyKernel3'
+        default: 'https://github.com/fa-ska/AnyKernel3'
         required: true
         type: string
 jobs:
