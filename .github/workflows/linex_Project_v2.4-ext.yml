@@ -50,7 +50,7 @@ on:
         type: string
       AK3:
         description: 'AnyKernel3'
-        default: 'https://github.com/fa-ska/AnyKernel3'
+        default: 'https://github.com/fa-ska/AnyKernel3Osmosis/tree/beryllium'
         required: true
         type: string
 jobs:
