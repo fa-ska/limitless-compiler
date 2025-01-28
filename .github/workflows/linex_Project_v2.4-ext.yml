@@ -166,13 +166,8 @@ jobs:
             fi
          fi
          rm -rf KernelSU
-         if [ ${{ inputs.kernelsu }} == v0.7.6 ]; then
+         if [ ${{ inputs.kernelsu }} == ksu ]; then
             curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s v0.7.6
-         elif [ ${{ inputs.kernelsu }} == v0.9.5 ]; then
-            curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s v0.9.5
-         elif [ ${{ inputs.kernelsu }} == v1.0.3 ]; then
-            curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s v0.9.5
-            sed -i 's!$(eval KSU_VERSION=$(shell expr 10000 + $(KSU_GIT_VERSION) + 200))!$(eval KSU_VERSION=12018)!g' KernelSU/kernel/Makefile
          elif [ ${{ inputs.kernelsu }} == next ]; then
             curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
          elif [ ${{ inputs.kernelsu }} != false ]; then
@@ -191,7 +186,7 @@ jobs:
          if [ ${{ inputs.aosp-clang }} == false ]; then
             echo "aosp-clang disable"
          else
-            export PATH=$HOME/clang/bin:$HOME/gcc-64/bin:$HOME/gcc-32:$PATH
+            export PATH=$HOME/clang/bin:$HOME/gcc-64/bin:$HOME/gcc-32/bin:$PATH
          fi
          export KBUILD_BUILD_USER="linex"
          export KBUILD_BUILD_HOST="project"
