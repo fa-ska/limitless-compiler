@@ -40,7 +40,7 @@ on:
         type: string
       susfs4ksu:
         description: 'susfs4ksu | false for disable'
-        default: 'curl -LSs "https://gitlab.com/simonpunk/susfs4ksu" | bash -s next-susfs'
+        default: 'https://gitlab.com/simonpunk/susfs4ksu.git'
         required: true
         type: string
       disable-lto:
