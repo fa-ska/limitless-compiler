@@ -10,7 +10,7 @@ on:
         type: string
       name:
         description: 'Name'
-        default: 'Attitude-'
+        default: 'Attitude-Ksu-next'
         required: true
         type: string
       compiler:
