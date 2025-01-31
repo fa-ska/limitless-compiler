@@ -39,8 +39,8 @@ on:
         required: true
         type: string
       kernelsu:
-        description: 'KernelSU-Next | false for disable'
-        default: 'curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next'
+        description: 'KernelSU-Next-susfs | false for disable'
+        default: 'curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next-susfs'
         required: true
         type: string
       disable-lto:
@@ -167,7 +167,7 @@ jobs:
          fi
          rm -rf KernelSU
          if [ ${{ inputs.kernelsu }} == next ]; then
-            curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
+            curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next-susfs
          elif [ ${{ inputs.kernelsu }} == ksu ]; then
             curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s v0.9.5
          elif [ ${{ inputs.kernelsu }} != false ]; then
