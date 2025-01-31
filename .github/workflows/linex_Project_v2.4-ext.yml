@@ -39,7 +39,7 @@ on:
         required: true
         type: string
       kernelsu:
-        description: 'KernelSU | false for disable'
+        description: 'KernelSU-Next | false for disable'
         default: 'curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next'
         required: true
         type: string
@@ -155,7 +155,7 @@ jobs:
                   echo "CONFIG_LTO_NONE=y" | tee -a arch/arm64/configs/${{ inputs.kernel-config }} >/dev/null
              fi
          fi
-    - name: Setup KernelSU
+    - name: Setup KernelSU-Next
       run: |
          if [ ${{ inputs.kernel-url }} != false ]; then
             cd kernel-dir
