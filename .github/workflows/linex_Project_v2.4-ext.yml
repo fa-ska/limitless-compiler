@@ -47,11 +47,7 @@ on:
         description: 'susfs4ksu | false for disable'
         default: 'https://gitlab.com/simonpunk/susfs4ksu.git'
         required: true
-        type: string
-        description: 'AnyKernel3'
-        default: 'https://github.com/fa-ska/AnyKernel3Osmosis'
-        required: true
-        type: string
+        type: string        
       AK3:
         description: 'AnyKernel3'
         default: 'https://github.com/fa-ska/AnyKernel3Osmosis'
