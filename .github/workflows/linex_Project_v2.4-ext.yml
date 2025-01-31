@@ -38,9 +38,9 @@ on:
         default: ''
         required: true
         type: string
-      kernelsu:
-        description: 'KernelSU-Next-susfs | false for disable'
-        default: 'curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next-susfs'
+      susfs4ksu:
+        description: 'susfs4ksu | false for disable'
+        default: 'curl -LSs "https://gitlab.com/simonpunk/susfs4ksu" | bash -s next-susfs'
         required: true
         type: string
       disable-lto:
@@ -155,24 +155,21 @@ jobs:
                   echo "CONFIG_LTO_NONE=y" | tee -a arch/arm64/configs/${{ inputs.kernel-config }} >/dev/null
              fi
          fi
-    - name: Setup KernelSU-Next
+    - name: Setup susfs4ksu
       run: |
-         if [ ${{ inputs.kernel-url }} != false ]; then
-            cd kernel-dir
-         fi
-         if [ ${{ inputs.kernel-url }} == false ]; then
-            if [ ${{ inputs.kernel-branch }} != main ]; then
-               ${{ inputs.kernel-branch }}
-            fi
-         fi
-         rm -rf KernelSU
-         if [ ${{ inputs.kernelsu }} == next ]; then
-            curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next-susfs
-         elif [ ${{ inputs.kernelsu }} == ksu ]; then
-            curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s v0.9.5
-         elif [ ${{ inputs.kernelsu }} != false ]; then
-            ${{ inputs.kernelsu }}
-         fi
+         cd kernel-dir
+         if [ ${{ inputs.susfs4ksu }} != true ]; then
+            git clone --depth=1 ${{ inputs.susfs4ksu }} -b kernel-4.9 susfs4ksu
+            cp 10_enable_susfs_for_ksu.patch ./KernelSU
+            cp susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU
+            cp susfs4ksu/kernel_patches/50_add_susfs_in_kernel-4.9.patch ./
+            cp susfs4ksu/kernel_patches/fs/susfs.c ./fs
+            cp susfs4ksu/kernel_patches/include/linux/susfs.h ./include/linux
+            cd KernelSU
+            patch -p1 < 10_enable_susfs_for_ksu.patch
+            cd ..
+            patch -p1 < 50_add_susfs_in_kernel-4.9.patch
+         fi    
     - name: Compile
       run: |
          mkdir -p -v out
