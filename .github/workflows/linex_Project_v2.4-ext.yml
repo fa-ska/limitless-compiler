@@ -52,6 +52,11 @@ on:
         default: 'https://github.com/fa-ska/AnyKernel3Osmosis'
         required: true
         type: string
+      AK3:
+        description: 'AnyKernel3'
+        default: 'https://github.com/fa-ska/AnyKernel3Osmosis'
+        required: true
+        type: string        
 jobs:
   linext-24:
     runs-on: ${{ inputs.ubuntu }}
