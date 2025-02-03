@@ -45,7 +45,7 @@ on:
         type: string        
       susfs4ksu:
         description: 'susfs4ksu | false for disable'
-        default: 'curl -LSs "https://gitlab.com/simonpunk/susfs4ksu.git" | bash -s next-susfs'
+        default: 'curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next-susfs'
         required: true
         type: string        
       AK3:
