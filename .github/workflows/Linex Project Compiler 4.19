@@ -1,0 +1,86 @@
+name: Linex Project Compiler 4.19
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'Nama Hasil Build'
+        default: '4.19_kernel'
+      kernel-url:
+        description: 'URL Repo Kernel'
+        default: 'https://github.com/linex-17/Limitless.git'
+      kernel-branch:
+        description: 'Branch'
+        default: 'main'
+      kernel-config:
+        description: 'Defconfig'
+        default: ''
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Environment & Swap
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison build-essential curl flex git git-core gnupg gperf \
+            libssl-dev libxml2-utils lzop make zip zstd python3 ca-certificates \
+            clang lld llvm aarch64-linux-gnu-gcc device-tree-compiler
+          
+          # Swap 16GB
+          sudo fallocate -l 16G /swapfile && sudo chmod 600 /swapfile
+          sudo mkswap /swapfile && sudo swapon /swapfile
+
+      - name: Toolchain Setup
+        run: |
+          # AOSP Clang r530567 (Cocok untuk Kernel 4.19+)
+          mkdir -p $HOME/clang
+          curl -LSs "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r530567.tar.gz" | tar -C $HOME/clang -xz
+          
+          # GCC for Cross-Compilation
+          mkdir -p $HOME/gcc64 $HOME/gcc32
+          curl -LSs "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/0a0604336d4d1067aa1aaef8d3779b31fcee841d.tar.gz" | tar -C $HOME/gcc64 -xz
+          curl -LSs "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/+archive/4d16d93f49c2b5ecdd0f12c38d194835dd595603.tar.gz" | tar -C $HOME/gcc32 -xz
+
+      - name: Source & KernelSU
+        run: |
+          git clone --depth=1 ${{ inputs.kernel-url }} -b ${{ inputs.kernel-branch }} kernel
+          cd kernel
+          # Setup KernelSU-Next
+          curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
+
+      - name: Compilation
+        working-directory: kernel
+        run: |
+          export PATH="$HOME/clang/bin:$HOME/gcc64/bin:$HOME/gcc32/bin:$PATH"
+          export KBUILD_BUILD_USER="linex"
+          export KBUILD_BUILD_HOST="fa_ska"
+          
+          # Build Config
+          make -j$(nproc --all) O=out ARCH=arm64 ${{ inputs.kernel-config }}
+          
+          # Build Kernel
+          make -j$(nproc --all) O=out ARCH=arm64 \
+            CC=clang \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=aarch64-linux-android- \
+            CROSS_COMPILE_ARM32=arm-linux-androideabi- \
+            LLVM=1 LLVM_IAS=1
+
+      - name: Packing
+        run: |
+          git clone --depth=1 https://github.com/osm0sis/AnyKernel3 AnyKernel3
+          rm -rf AnyKernel3/.git AnyKernel3/LICENSE AnyKernel3/README.md
+          
+          # Cari hasil Image secara otomatis
+          find kernel/out/arch/arm64/boot/ -name "Image*" -exec cp {} AnyKernel3/ \;
+          [ -f kernel/out/arch/arm64/boot/dtbo.img ] && cp kernel/out/arch/arm64/boot/dtbo.img AnyKernel3/
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.name }}
+          path: AnyKernel3/*
