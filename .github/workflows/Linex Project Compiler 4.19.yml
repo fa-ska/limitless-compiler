@@ -46,12 +46,14 @@ jobs:
           cd kernel
           curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
           
-          # --- JURUS PENGHANCUR ERROR VDSO ---
-          # 1. Hapus referensi VDSO dari Makefile utama agar tidak dikompilasi sama sekali
-          sed -i '/obj-y.*vdso\//d' arch/arm64/kernel/Makefile || true
-          # 2. Paksa matikan VDSO di config secara langsung
-          echo "CONFIG_VDSO=y" >> arch/arm64/configs/${{ inputs.device-defconfig }}
-          sed -i 's/CONFIG_VDSO=y/CONFIG_VDSO=n/g' arch/arm64/configs/${{ inputs.device-defconfig }} || true
+          # --- OPERASI TOTAL PEMBERSIHAN VDSO ---
+          # 1. Hapus isi folder vdso agar tidak ada file assembly yang bisa dikompilasi
+          rm -rf arch/arm64/kernel/vdso/*
+          # 2. Buat Makefile kosong di dalam folder tersebut agar build tidak error saat mencari file
+          echo "obj-y :=" > arch/arm64/kernel/vdso/Makefile
+          # 3. Matikan referensi VDSO di Makefile utama dengan lebih presisi
+          sed -i 's/obj-$(CONFIG_VDSO).*+=/ # obj-$(CONFIG_VDSO) +=/g' arch/arm64/kernel/Makefile || true
+          sed -i 's/obj-y.*+=.*vdso\// # obj-y += vdso\//g' arch/arm64/kernel/Makefile || true
 
       - name: Compilation
         run: |
