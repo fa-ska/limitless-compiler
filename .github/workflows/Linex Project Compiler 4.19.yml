@@ -47,16 +47,16 @@ jobs:
           # 2. Patching (KernelSU & Stability Fix)
           curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
           
-          # Fix Techpack & Drivers (Sering bikin error di 4.19)
+          # Fix Techpack & Drivers
           if [ ! -d "techpack/mi845" ]; then
             sed -i 's/source "techpack\/Kconfig"/# /g' Kconfig || true
             sed -i 's/obj-y += techpack\// # /g' Makefile || true
           fi
           
-          # Fix multiple definition of yylloc (GCC 10+)
+          # Fix multiple definition of yylloc
           sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' scripts/dtc/dtc-lexer.lex.c_shipped || true
 
-          # 3. Masak Kernel (The Ultimate Stability Mode)
+          # 3. Masak Kernel
           export PATH="$HOME/toolchain/bin:$PATH"
           export KBUILD_BUILD_USER="fa_s_ka"
           export KBUILD_BUILD_HOST="linext"
@@ -66,13 +66,15 @@ jobs:
             arch/arm64/configs/${{ inputs.base-defconfig }} \
             arch/arm64/configs/${{ inputs.device-defconfig }}
           
-          # KCFLAGS di bawah ini adalah "obat" buat nembus error memori di 7740.png
+          # --- FIX FOR 7742.png (Pondasi dulu) ---
+          make O=out ARCH=arm64 CROSS_COMPILE=aarch64-elf- prepare -j1
+          
+          # --- GASPOL (Fix for 7740.png & 7737.png) ---
           make -j$(nproc --all) O=out ARCH=arm64 \
             CROSS_COMPILE=aarch64-elf- \
             CROSS_COMPILE_ARM32=arm-eabi- \
-            KCFLAGS="-w -fpermissive -fno-stack-protector -D_FORTIFY_SOURCE=0 -Wno-error -Wno-strict-aliasing" \
+            KCFLAGS="-w -fpermissive -fno-stack-protector -D_FORTIFY_SOURCE=0 -Wno-error" \
             KCPPFLAGS="-D__ASSEMBLY__ -D_FORTIFY_SOURCE=0"
-
 
       - name: Packing
         run: |
@@ -83,7 +85,6 @@ jobs:
           elif [ -f kernel/out/arch/arm64/boot/Image ]; then
             cp kernel/out/arch/arm64/boot/Image AnyKernel3/Image
           fi
-          # Cek hasil DTBO
           [ -f kernel/out/arch/arm64/boot/dtbo.img ] && cp kernel/out/arch/arm64/boot/dtbo.img AnyKernel3/
 
       - name: Upload
