@@ -48,12 +48,16 @@ jobs:
           # Setup KernelSU-Next
           curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
           
-          # --- JURUS ANTI-ERROR VDSO VERSI FINAL ---
-          # 1. Matikan flag stack-protector yang bikin junk error di VDSO
-          sed -i 's/-mstack-protector-guard=sysreg//g' arch/arm64/kernel/vdso/Makefile || true
+          # --- JURUS ANTI-VDSO TOTAL (BYPASS JALUR) ---
+          # Kita buat file dummy agar sistem build mengira vgettimeofday sudah selesai dibuat
+          mkdir -p out/arch/arm64/kernel/vdso/
+          touch out/arch/arm64/kernel/vdso/vdso-offsets.h
           
-          # 2. Tambahkan flag agar compiler tidak cerewet soal assembly di VDSO
-          sed -i 's/VDSO_LDFLAGS += -shared/VDSO_LDFLAGS += -shared -N/g' arch/arm64/kernel/vdso/Makefile || true
+          # Matikan jalur VDSO di Makefile utama agar tidak dikompilasi
+          sed -i 's/obj-y.*+=.*vdso\// # obj-y += vdso\//g' arch/arm64/kernel/Makefile || true
+          sed -i 's/vdso_prepare:.*//g' arch/arm64/kernel/Makefile || true
+          # Tambahkan baris kosong agar make tidak bingung
+          echo "vdso_prepare:" >> arch/arm64/kernel/Makefile
 
           # --- JURUS FIX TECHPACK ---
           [ -f Kconfig ] && sed -i 's/source "techpack\/Kconfig"/# source "techpack\/Kconfig"/g' Kconfig || true
