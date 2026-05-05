@@ -12,10 +12,10 @@ on:
         description: 'Branch'
         default: 'lineage-23.2_xiaomi'
       base-defconfig:
-        description: 'Base Defconfig (Path dari arch/arm64/configs/)'
+        description: 'Base Defconfig (Contoh: vendor/sdm845-perf_defconfig)'
         default: 'vendor/sdm845-perf_defconfig'
       device-defconfig:
-        description: 'Device Config/Fragment (Path dari arch/arm64/configs/)'
+        description: 'Device Config (Contoh: vendor/xiaomi/beryllium.config)'
         default: 'vendor/xiaomi/beryllium.config'
 
 jobs:
@@ -45,7 +45,7 @@ jobs:
           git clone --depth=1 ${{ inputs.kernel-url }} -b ${{ inputs.kernel-branch }} kernel
           cd kernel
           curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
-          # Patch otomatis untuk fix error vgettimeofday junk at end of line
+          # Hard patch untuk mematikan flag bermasalah di VDSO
           sed -i 's/-mstack-protector-guard=sysreg//g' arch/arm64/kernel/vdso/Makefile || true
 
       - name: Compilation
@@ -57,24 +57,26 @@ jobs:
           
           mkdir -p out
           
-          # Menggunakan input manual untuk defconfig
-          # Jalur path otomatis mengambil dari input GitHub UI
+          # Menggunakan input manual dari GitHub UI
           ARCH=arm64 ./scripts/kconfig/merge_config.sh -O out \
             arch/arm64/configs/${{ inputs.base-defconfig }} \
             arch/arm64/configs/${{ inputs.device-defconfig }}
           
-          # Kompilasi dengan pemaksaan Linker GCC untuk kestabilan VDSO
+          # Build dengan pemaksaan penuh agar VDSO menggunakan GCC Assembler
           make -j$(nproc --all) O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-android- \
             CROSS_COMPILE_ARM32=arm-linux-androideabi- \
+            HOSTCC=gcc \
+            HOSTCXX=g++ \
             LD=aarch64-linux-android-ld \
-            NM=llvm-nm \
-            AR=llvm-ar \
-            OBJCOPY=llvm-objcopy \
-            OBJDUMP=llvm-objdump \
-            STRIP=llvm-strip \
+            AS=aarch64-linux-android-as \
+            STRIP=aarch64-linux-android-strip \
+            OBJCOPY=aarch64-linux-android-objcopy \
+            OBJDUMP=aarch64-linux-android-objdump \
+            NM=aarch64-linux-android-nm \
+            OBJSIZE=aarch64-linux-android-size \
             LLVM=1 \
             LLVM_IAS=0
 
