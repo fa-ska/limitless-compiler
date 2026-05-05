@@ -38,7 +38,6 @@ jobs:
       - name: Toolchain Setup
         run: |
           mkdir -p $HOME/toolchain
-          # Menggunakan GCC dari mvaisakh sesuai script awalmu
           curl -LSs "https://github.com/mvaisakh/gcc-arm64/archive/refs/heads/master.tar.gz" | tar -C $HOME/toolchain --strip-components=1 -xz
 
       - name: Source, Patching & Compilation
@@ -47,13 +46,18 @@ jobs:
           git clone --recursive --depth=1 ${{ inputs.kernel-url }} -b ${{ inputs.kernel-branch }} kernel
           cd kernel
           
-          # 2. Patching (KernelSU-Next)
-          curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
+          # 2. Fix Techpack (Penyebab Error 'can't open techpack/mi845/Kconfig')
+          # Menghapus paksa baris yang memanggil techpack jika foldernya tidak lengkap
+          sed -i '/techpack/d' Kconfig
+          sed -i '/techpack/d' Makefile
           
           # Fix common compilation issues
           sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' scripts/dtc/dtc-lexer.lex.c_shipped || true
           
-          # 3. Persiapan Build
+          # 3. Patching (KernelSU-Next)
+          curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
+          
+          # 4. Persiapan Build
           export PATH="$HOME/toolchain/bin:$PATH"
           export KBUILD_BUILD_USER="fa_s_ka"
           export KBUILD_BUILD_HOST="linext"
@@ -68,13 +72,14 @@ jobs:
             arch/arm64/configs/${{ inputs.base-defconfig }} \
             arch/arm64/configs/${{ inputs.device-defconfig }}
 
-          # --- FIX ERROR 'u8' & 'bounds.c' ---
-          # Langkah ini wajib agar header kernel (linux/types.h dll) digenerate dengan benar
+          # Sinkronisasi konfigurasi (Langkah krusial)
+          make O=out ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE oldconfig
+          
+          # Generate headers & scripts
           make O=out ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE prepare -j$(nproc --all)
           make O=out ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE scripts -j$(nproc --all)
           
-          # 4. Kompilasi Utama (Gaspol)
-          # Menggunakan flag -w dan -fpermissive untuk mengabaikan warning yang dianggap error
+          # 5. Kompilasi Utama
           make -j$(nproc --all) O=out ARCH=$ARCH \
             CROSS_COMPILE=$CROSS_COMPILE \
             CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 \
@@ -85,15 +90,11 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3 AnyKernel3
-          
-          # Cek lokasi hasil build dan copy ke AnyKernel3
           if [ -f kernel/out/arch/arm64/boot/Image.gz-dtb ]; then
             cp kernel/out/arch/arm64/boot/Image.gz-dtb AnyKernel3/Image.gz-dtb
           elif [ -f kernel/out/arch/arm64/boot/Image ]; then
             cp kernel/out/arch/arm64/boot/Image AnyKernel3/Image
           fi
-          
-          # Copy DTBO jika ada
           [ -f kernel/out/arch/arm64/boot/dtbo.img ] && cp kernel/out/arch/arm64/boot/dtbo.img AnyKernel3/
 
       - name: Upload Artifact
