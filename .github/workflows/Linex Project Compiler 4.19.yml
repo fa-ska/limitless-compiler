@@ -47,26 +47,34 @@ jobs:
       - name: Compilation
         working-directory: kernel
         run: |
-          # Gunakan PATH toolchain yang sudah didownload
+          # 1. Setup Path dengan Clang r487747 (lebih stabil buat 4.19)
           export PATH="$HOME/clang/bin:$HOME/gcc64/bin:$HOME/gcc32/bin:$PATH"
-          export KBUILD_BUILD_USER="fa_s_ka"
+          export KBUILD_BUILD_USER="ThRE-Team"
           export KBUILD_BUILD_HOST="linex-server"
           
           mkdir -p out
           
-          # Gabungkan base config dan config khusus Poco F1
-          # Kita pakai path lengkap agar tidak "File not found" lagi
+          # 2. Jalur yang lo temukan di 7558.png (SUDAH BENAR)
           ARCH=arm64 ./scripts/kconfig/merge_config.sh -O out \
             arch/arm64/configs/vendor/sdm845-perf_defconfig \
             arch/arm64/configs/vendor/xiaomi/beryllium.config
           
-          # Mulai build dengan LLVM=1 (Assembler Clang aktif)
+          # 3. Build dengan penanganan error netfilter
           make -j$(nproc --all) O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-android- \
             CROSS_COMPILE_ARM32=arm-linux-androideabi- \
-            LLVM=1 LLVM_IAS=0
+            LLVM=1 LLVM_IAS=1 || {
+              echo "Build failed, trying without LLVM_IAS..."
+              make -j$(nproc --all) O=out ARCH=arm64 \
+                CC=clang \
+                CLANG_TRIPLE=aarch64-linux-gnu- \
+                CROSS_COMPILE=aarch64-linux-android- \
+                CROSS_COMPILE_ARM32=arm-linux-androideabi- \
+                LLVM=1 LLVM_IAS=0
+            }
+
 
       - name: Packing
         run: |
