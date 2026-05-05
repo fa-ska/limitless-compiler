@@ -78,7 +78,7 @@ jobs:
             LD=aarch64-linux-android-ld \
             AS=aarch64-linux-android-as \
             LLVM=1 \
-            LLVM_IAS=1
+            LLVM_IAS=0
 
       - name: Packing
         run: |
