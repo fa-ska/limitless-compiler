@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       name:
-        description: 'Nama Hasil Build (Contoh: Beryllium-4.19)'
+        description: 'Nama Hasil Build'
         default: '4.19_kernel'
       kernel-url:
         description: 'URL Repo Kernel'
@@ -12,7 +12,7 @@ on:
         description: 'Branch'
         default: 'lineage-23.2_xiaomi'
       kernel-config:
-        description: 'Defconfig (Gunakan spasi jika lebih dari satu)'
+        description: 'Defconfig'
         default: 'vendor/sdm845-perf_defconfig xiaomi/beryllium.config'
 
 jobs:
@@ -28,31 +28,22 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             bc bison build-essential curl flex git git-core gnupg gperf \
             libssl-dev libxml2-utils lzop make zip zstd python3 ca-certificates \
-            clang lld llvm gcc-arm-linux-gnueabi gcc-aarch64-linux-gnu
-
-
+            clang lld llvm device-tree-compiler libelf-dev
 
       - name: Toolchain Setup
         run: |
-          # Download AOSP Clang r530567
           mkdir -p $HOME/clang
           curl -LSs "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r530567.tar.gz" | tar -C $HOME/clang -xz
-          
-          # Download GCC 64 & 32 (Cross-compilers)
           mkdir -p $HOME/gcc64 $HOME/gcc32
           curl -LSs "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/0a0604336d4d1067aa1aaef8d3779b31fcee841d.tar.gz" | tar -C $HOME/gcc64 -xz
           curl -LSs "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/+archive/4d16d93f49c2b5ecdd0f12c38d194835dd595603.tar.gz" | tar -C $HOME/gcc32 -xz
 
       - name: Source & KernelSU
         run: |
-          # Clone dengan deteksi error
-          git clone --depth=1 ${{ inputs.kernel-url }} -b ${{ inputs.kernel-branch }} kernel || { echo "Clone gagal! Cek URL/Branch"; exit 1; }
+          git clone --depth=1 ${{ inputs.kernel-url }} -b ${{ inputs.kernel-branch }} kernel
           cd kernel
-          # Setup KernelSU-Next
           curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
 
-      - name: Compilation
-        working-directory: kernel
       - name: Compilation
         working-directory: kernel
         run: |
@@ -60,11 +51,9 @@ jobs:
           export KBUILD_BUILD_USER="linex"
           export KBUILD_BUILD_HOST="fa_ska"
           
-          # Path Defconfig
-          make O=out ARCH=arm64 vendor/sdm845-perf_defconfig
-          make O=out ARCH=arm64 xiaomi/beryllium.config
+          # Menggunakan path vendor/ karena lokasi defconfig di repo ThRE-Team ada di sana
+          make O=out ARCH=arm64 ${{ inputs.kernel-config }}
           
-          # Lanjutkan build
           make -j$(nproc --all) O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
@@ -72,29 +61,15 @@ jobs:
             CROSS_COMPILE_ARM32=arm-linux-androideabi- \
             LLVM=1 LLVM_IAS=1
 
-
-      - name: Check Results
-        run: |
-          # Memastikan Image kernel berhasil terbuat sebelum lanjut packing
-          if [ ! -f kernel/out/arch/arm64/boot/Image.gz-dtb ] && [ ! -f kernel/out/arch/arm64/boot/Image ]; then
-            echo "Build Gagal: Kernel Image tidak ditemukan!"
-            exit 1
-          fi
-
-      - name: Packing Flashable Zip
+      - name: Packing
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3 AnyKernel3
-          rm -rf AnyKernel3/.git AnyKernel3/LICENSE AnyKernel3/README.md
-          
-          # Copy hasil build ke AnyKernel3
           find kernel/out/arch/arm64/boot/ -name "Image*" -exec cp {} AnyKernel3/ \;
           [ -f kernel/out/arch/arm64/boot/dtbo.img ] && cp kernel/out/arch/arm64/boot/dtbo.img AnyKernel3/
-          
-          # Ganti nama di anykernel.sh agar sesuai input
-          sed -i "s/device.name1=./device.name1=beryllium/g" AnyKernel3/anykernel.sh
 
-      - name: Upload Artifact
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.name }}
           path: AnyKernel3/*
+
