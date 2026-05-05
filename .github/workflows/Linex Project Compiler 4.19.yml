@@ -33,58 +33,70 @@ jobs:
             bc bison build-essential curl flex git git-core gnupg gperf \
             libssl-dev libxml2-utils lzop make zip zstd python3 ca-certificates \
             clang lld llvm device-tree-compiler libelf-dev wget libdebuginfod-dev \
-            libssl-dev rsync
+            rsync
 
-      - name: Toolchain Setup
+      - name: Toolchain Setup (AOSP Clang)
         run: |
-          mkdir -p $HOME/toolchain
-          curl -LSs "https://github.com/mvaisakh/gcc-arm64/archive/refs/heads/master.tar.gz" | tar -C $HOME/toolchain --strip-components=1 -xz
+          mkdir -p $HOME/clang
+          # Menggunakan Clang r450784d (Standard Android 12/13)
+          wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master/clang-r450784d.tar.gz -O clang.tar.gz
+          tar -C $HOME/clang -zxf clang.tar.gz
+          
+          mkdir -p $HOME/gcc64
+          wget -q https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/heads/master.tar.gz -O gcc64.tar.gz
+          tar -C $HOME/gcc64 -zxf gcc64.tar.gz
 
       - name: Source, Patching & Compilation
         run: |
-          # 1. Ambil Source
           git clone --recursive --depth=1 ${{ inputs.kernel-url }} -b ${{ inputs.kernel-branch }} kernel
           cd kernel
           
-          # 2. Fix Techpack (Penyebab Error 'can't open techpack/mi845/Kconfig')
-          # Menghapus paksa baris yang memanggil techpack jika foldernya tidak lengkap
-          sed -i '/techpack/d' Kconfig
-          sed -i '/techpack/d' Makefile
-          
-          # Fix common compilation issues
+          # 1. Agresif Fix Techpack & Header
+          sed -i '/techpack/d' Kconfig Makefile
           sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' scripts/dtc/dtc-lexer.lex.c_shipped || true
           
-          # 3. Patching (KernelSU-Next)
+          # 2. Patching KernelSU
           curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
           
-          # 4. Persiapan Build
-          export PATH="$HOME/toolchain/bin:$PATH"
+          # 3. Setup Environment variables
+          CLANG_DIR=$HOME/clang
+          GCC_DIR=$HOME/gcc64
+          export PATH="$CLANG_DIR/bin:$GCC_DIR/bin:$PATH"
+          
+          export ARCH=arm64
           export KBUILD_BUILD_USER="fa_s_ka"
           export KBUILD_BUILD_HOST="linext"
-          export ARCH=arm64
-          export CROSS_COMPILE=aarch64-elf-
-          export CROSS_COMPILE_ARM32=arm-eabi-
           
+          # Definisi Compiler (Clang + GCC as linker)
+          MAKE_PARAMS=(
+            ARCH=arm64
+            O=out
+            CC=clang
+            CLANG_TRIPLE=aarch64-linux-gnu-
+            CROSS_COMPILE=aarch64-linux-android-
+            LD=ld.lld
+            AR=llvm-ar
+            NM=llvm-nm
+            OBJCOPY=llvm-objcopy
+            OBJDUMP=llvm-objdump
+            STRIP=llvm-strip
+          )
+
           mkdir -p out
           
-          # Gabungkan defconfigs
+          # 4. Create Config
           ./scripts/kconfig/merge_config.sh -O out \
             arch/arm64/configs/${{ inputs.base-defconfig }} \
             arch/arm64/configs/${{ inputs.device-defconfig }}
 
-          # Sinkronisasi konfigurasi (Langkah krusial)
-          make O=out ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE oldconfig
+          # 5. Build Process
+          make "${MAKE_PARAMS[@]}" oldconfig
+          make "${MAKE_PARAMS[@]}" prepare -j$(nproc --all)
+          make "${MAKE_PARAMS[@]}" scripts -j$(nproc --all)
           
-          # Generate headers & scripts
-          make O=out ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE prepare -j$(nproc --all)
-          make O=out ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE scripts -j$(nproc --all)
-          
-          # 5. Kompilasi Utama
-          make -j$(nproc --all) O=out ARCH=$ARCH \
-            CROSS_COMPILE=$CROSS_COMPILE \
-            CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 \
-            KCFLAGS="-w -fpermissive -fno-stack-protector -D_FORTIFY_SOURCE=0" \
-            KCPPFLAGS="-D__ASSEMBLY__ -D_FORTIFY_SOURCE=0"
+          # Gaspol Kompilasi Utama
+          make -j$(nproc --all) "${MAKE_PARAMS[@]}" \
+            KCFLAGS="-w -fpermissive -fno-stack-protector"
 
       - name: Packing
         run: |
