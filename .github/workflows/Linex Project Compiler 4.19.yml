@@ -35,45 +35,39 @@ jobs:
             clang lld llvm device-tree-compiler libelf-dev wget libdebuginfod-dev \
             rsync
 
-      - name: Toolchain Setup (AOSP Clang)
+      - name: Toolchain Setup (Proton Clang)
         run: |
-          mkdir -p $HOME/clang
-          # Menggunakan Clang r450784d (Standard Android 12/13)
-          wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master/clang-r450784d.tar.gz -O clang.tar.gz
-          tar -C $HOME/clang -zxf clang.tar.gz
-          
-          mkdir -p $HOME/gcc64
-          wget -q https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/heads/master.tar.gz -O gcc64.tar.gz
-          tar -C $HOME/gcc64 -zxf gcc64.tar.gz
+          mkdir -p $HOME/proton-clang
+          # Menggunakan Proton Clang terbaru (sangat stabil untuk 4.19)
+          curl -LSs "https://github.com/kdrag0n/proton-clang/archive/refs/heads/master.tar.gz" | tar -C $HOME/proton-clang --strip-components=1 -xz
 
       - name: Source, Patching & Compilation
         run: |
+          # 1. Ambil Source
           git clone --recursive --depth=1 ${{ inputs.kernel-url }} -b ${{ inputs.kernel-branch }} kernel
           cd kernel
           
-          # 1. Agresif Fix Techpack & Header
-          sed -i '/techpack/d' Kconfig Makefile
+          # 2. Hard-Fix Techpack & Header
+          find . -name "Kconfig" -exec sed -i '/techpack/d' {} +
+          find . -name "Makefile" -exec sed -i '/techpack/d' {} +
           sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' scripts/dtc/dtc-lexer.lex.c_shipped || true
           
-          # 2. Patching KernelSU
+          # 3. Patching KernelSU
           curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
           
-          # 3. Setup Environment variables
-          CLANG_DIR=$HOME/clang
-          GCC_DIR=$HOME/gcc64
-          export PATH="$CLANG_DIR/bin:$GCC_DIR/bin:$PATH"
-          
+          # 4. Setup Environment
+          export PATH="$HOME/proton-clang/bin:$PATH"
           export ARCH=arm64
           export KBUILD_BUILD_USER="fa_s_ka"
           export KBUILD_BUILD_HOST="linext"
           
-          # Definisi Compiler (Clang + GCC as linker)
+          # Proton Clang tidak butuh GCC terpisah karena sudah self-contained
           MAKE_PARAMS=(
             ARCH=arm64
             O=out
             CC=clang
-            CLANG_TRIPLE=aarch64-linux-gnu-
-            CROSS_COMPILE=aarch64-linux-android-
+            CROSS_COMPILE=aarch64-linux-gnu-
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi-
             LD=ld.lld
             AR=llvm-ar
             NM=llvm-nm
@@ -84,17 +78,17 @@ jobs:
 
           mkdir -p out
           
-          # 4. Create Config
+          # 5. Create Config
           ./scripts/kconfig/merge_config.sh -O out \
             arch/arm64/configs/${{ inputs.base-defconfig }} \
             arch/arm64/configs/${{ inputs.device-defconfig }}
 
-          # 5. Build Process
+          # 6. Build Process
           make "${MAKE_PARAMS[@]}" oldconfig
           make "${MAKE_PARAMS[@]}" prepare -j$(nproc --all)
           make "${MAKE_PARAMS[@]}" scripts -j$(nproc --all)
           
-          # Gaspol Kompilasi Utama
+          # Kompilasi Utama
           make -j$(nproc --all) "${MAKE_PARAMS[@]}" \
             KCFLAGS="-w -fpermissive -fno-stack-protector"
 
@@ -102,11 +96,13 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3 AnyKernel3
-          if [ -f kernel/out/arch/arm64/boot/Image.gz-dtb ]; then
-            cp kernel/out/arch/arm64/boot/Image.gz-dtb AnyKernel3/Image.gz-dtb
-          elif [ -f kernel/out/arch/arm64/boot/Image ]; then
-            cp kernel/out/arch/arm64/boot/Image AnyKernel3/Image
-          fi
+          # Cari Image yang berhasil dibuat
+          for img in kernel/out/arch/arm64/boot/Image.gz-dtb kernel/out/arch/arm64/boot/Image.gz kernel/out/arch/arm64/boot/Image; do
+            if [ -f "$img" ]; then
+              cp "$img" AnyKernel3/
+              break
+            fi
+          done
           [ -f kernel/out/arch/arm64/boot/dtbo.img ] && cp kernel/out/arch/arm64/boot/dtbo.img AnyKernel3/
 
       - name: Upload Artifact
