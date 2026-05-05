@@ -36,11 +36,14 @@ jobs:
       - name: Toolchain Setup
         run: |
           mkdir -p $HOME/clang $HOME/gcc64 $HOME/gcc32
-          # AOSP Clang r416183b
-          curl -LSs "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r416183b.tar.gz" | tar -C $HOME/clang -xz
-          # GCC 4.9 (Wajib untuk Kernel 4.19)
-          curl -LSs "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/tags/android-12.1.0_r27/aarch64-linux-android-4.9.tar.gz" | tar -C $HOME/gcc64 -xz
-          curl -LSs "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/+archive/refs/tags/android-12.1.0_r27/arm-linux-androideabi-4.9.tar.gz" | tar -C $HOME/gcc32 -xz
+          
+          # Download Clang r416183b dari mirror yang lebih stabil
+          curl -LSs "https://raw.githubusercontent.com/ZyCromerZ/Clang/main/Google/r416183b/Clang-r416183b.tar.gz" | tar -C $HOME/clang -xz || \
+          curl -LSs "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r416183b.tar.gz" -o clang.tar.gz && tar -C $HOME/clang -xzf clang.tar.gz
+          
+          # Download GCC 4.9 (Direct Link)
+          curl -LSs "https://github.com/mvaisakh/gcc-arm64/archive/refs/heads/gcc-master.tar.gz" | tar -C $HOME/gcc64 --strip-components=1 -xz
+          curl -LSs "https://github.com/mvaisakh/gcc-arm/archive/refs/heads/gcc-master.tar.gz" | tar -C $HOME/gcc32 --strip-components=1 -xz
 
       - name: Source & Patching
         run: |
