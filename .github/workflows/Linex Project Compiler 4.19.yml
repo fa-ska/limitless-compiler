@@ -35,11 +35,17 @@ jobs:
 
       - name: Toolchain Setup
         run: |
-          # Pakai AOSP Clang 12.0 (Sangat stabil untuk Kernel 4.19 SDM845)
-          git clone --depth=1 https://github.com/LineageOS/android_prebuilts_clang_host_linux-x86_clang-r416183b.git $HOME/clang
-          # Pakai GCC resmi dari AOSP
-          git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9.git $HOME/gcc64
-          git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9.git $HOME/gcc32
+          mkdir -p $HOME/clang $HOME/gcc64 $HOME/gcc32
+          # Download Clang r416183b via Direct Link (Anti-Login)
+          wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r416183b.tar.gz -O clang.tar.gz
+          tar -C $HOME/clang -xzf clang.tar.gz
+
+          # Download GCC 4.9 via Direct Link (LineageOS Official Mirror)
+          wget -q https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9/archive/refs/heads/lineage-18.1.tar.gz -O gcc64.tar.gz
+          tar -C $HOME/gcc64 --strip-components=1 -xzf gcc64.tar.gz
+
+          wget -q https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9/archive/refs/heads/lineage-18.1.tar.gz -O gcc32.tar.gz
+          tar -C $HOME/gcc32 --strip-components=1 -xzf gcc32.tar.gz
 
       - name: Source & Patching
         run: |
@@ -54,19 +60,13 @@ jobs:
       - name: Compilation
         run: |
           cd kernel
-          # Masukkan semua binari ke PATH
           export PATH="$HOME/clang/bin:$HOME/gcc64/bin:$HOME/gcc32/bin:$PATH"
           export KBUILD_BUILD_USER="fa_s_ka"
           export KBUILD_BUILD_HOST="linext"
-          
           mkdir -p out
-          
-          # Merge Config
           ARCH=arm64 ./scripts/kconfig/merge_config.sh -O out \
             arch/arm64/configs/${{ inputs.base-defconfig }} \
             arch/arm64/configs/${{ inputs.device-defconfig }}
-          
-          # Build menggunakan kombinasi Clang + GCC (Paling aman buat SDM845)
           make -j$(nproc --all) O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
