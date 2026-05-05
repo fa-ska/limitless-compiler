@@ -37,17 +37,12 @@ jobs:
         run: |
           mkdir -p $HOME/clang $HOME/gcc64 $HOME/gcc32
           
-          # Pakai Proton Clang - Ini toolchain favorit dev Poco F1 (beryllium)
-          # Jauh lebih stabil dan gampang di-download di GitHub Actions
-          wget -q https://github.com/kdrag0n/proton-clang/archive/refs/heads/master.tar.gz -O clang.tar.gz
-          tar -C $HOME/clang --strip-components=1 -xzf clang.tar.gz
+          # Gunakan Clang dari Proton-Clang (Mirror khusus)
+          git clone --depth=1 https://github.com/kdrag0n/proton-clang $HOME/clang
           
-          # GCC 4.9 dari repo yang lebih "ikhlas" kasih download
-          wget -q https://github.com/lineage-targets/arm64-gcc/archive/refs/heads/master.tar.gz -O gcc64.tar.gz
-          tar -C $HOME/gcc64 --strip-components=1 -xzf gcc64.tar.gz
-          
-          wget -q https://github.com/lineage-targets/arm-gcc/archive/refs/heads/master.tar.gz -O gcc32.tar.gz
-          tar -C $HOME/gcc32 --strip-components=1 -xzf gcc32.tar.gz
+          # Gunakan GCC 4.9 (Mirror khusus yang anti-blokir)
+          git clone --depth=1 https://github.com/lineage-targets/arm64-gcc $HOME/gcc64
+          git clone --depth=1 https://github.com/lineage-targets/arm-gcc $HOME/gcc32
 
       - name: Source & Patching
         run: |
