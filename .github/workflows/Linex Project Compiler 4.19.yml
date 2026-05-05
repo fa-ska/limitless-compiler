@@ -11,6 +11,12 @@ on:
       kernel-branch:
         description: 'Branch'
         default: 'lineage-23.2_xiaomi'
+      base-defconfig:
+        description: 'Base Defconfig (Path dari arch/arm64/configs/)'
+        default: 'vendor/sdm845-perf_defconfig'
+      device-defconfig:
+        description: 'Device Config/Fragment (Path dari arch/arm64/configs/)'
+        default: 'vendor/xiaomi/beryllium.config'
 
 jobs:
   build:
@@ -39,6 +45,8 @@ jobs:
           git clone --depth=1 ${{ inputs.kernel-url }} -b ${{ inputs.kernel-branch }} kernel
           cd kernel
           curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
+          # Patch otomatis untuk fix error vgettimeofday junk at end of line
+          sed -i 's/-mstack-protector-guard=sysreg//g' arch/arm64/kernel/vdso/Makefile || true
 
       - name: Compilation
         working-directory: kernel
@@ -49,25 +57,24 @@ jobs:
           
           mkdir -p out
           
-          # Merge Config dengan jalur yang sudah diverifikasi (vendor/xiaomi/)
+          # Menggunakan input manual untuk defconfig
+          # Jalur path otomatis mengambil dari input GitHub UI
           ARCH=arm64 ./scripts/kconfig/merge_config.sh -O out \
-            arch/arm64/configs/vendor/sdm845-perf_defconfig \
-            arch/arm64/configs/vendor/xiaomi/beryllium.config
+            arch/arm64/configs/${{ inputs.base-defconfig }} \
+            arch/arm64/configs/${{ inputs.device-defconfig }}
           
-          # Build dengan pemaksaan Linker & Assembler GCC (untuk fix vgettimeofday)
+          # Kompilasi dengan pemaksaan Linker GCC untuk kestabilan VDSO
           make -j$(nproc --all) O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-android- \
             CROSS_COMPILE_ARM32=arm-linux-androideabi- \
             LD=aarch64-linux-android-ld \
-            AR=llvm-ar \
             NM=llvm-nm \
+            AR=llvm-ar \
             OBJCOPY=llvm-objcopy \
             OBJDUMP=llvm-objdump \
             STRIP=llvm-strip \
-            OBJSIZE=llvm-size \
-            V=0 \
             LLVM=1 \
             LLVM_IAS=0
 
