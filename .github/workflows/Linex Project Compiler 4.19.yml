@@ -47,19 +47,20 @@ jobs:
       - name: Compilation
         working-directory: kernel
         run: |
+          # Gunakan PATH toolchain yang sudah didownload
           export PATH="$HOME/clang/bin:$HOME/gcc64/bin:$HOME/gcc32/bin:$PATH"
-          export KBUILD_BUILD_USER="linex"
-          export KBUILD_BUILD_HOST="fa_ska"
+          export KBUILD_BUILD_USER="fa_s_ka"
+          export KBUILD_BUILD_HOST="linex-server"
           
-          # Buat folder out dulu
           mkdir -p out
           
-          # Cara penggabungan config yang benar untuk fragment
-          ARCH=arm64 scripts/kconfig/merge_config.sh -O out \
+          # Gabungkan base config dan config khusus Poco F1
+          # Kita pakai path lengkap agar tidak "File not found" lagi
+          ARCH=arm64 ./scripts/kconfig/merge_config.sh -O out \
             arch/arm64/configs/vendor/sdm845-perf_defconfig \
             arch/arm64/configs/xiaomi/beryllium.config
           
-          # Mulai kompilasi menggunakan config yang sudah digabung
+          # Mulai build dengan LLVM=1 (Assembler Clang aktif)
           make -j$(nproc --all) O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
