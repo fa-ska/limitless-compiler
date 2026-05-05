@@ -31,9 +31,11 @@ jobs:
             libssl-dev libxml2-utils lzop make zip zstd python3 ca-certificates \
             clang lld llvm device-tree-compiler libelf-dev
           
-          # Auto Swap 16GB
-          sudo fallocate -l 16G /swapfile && sudo chmod 600 /swapfile
-          sudo mkswap /swapfile && sudo swapon /swapfile
+          # Buat Swap baru 16GB
+          sudo fallocate -l 16G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
 
       - name: Toolchain Setup
         run: |
