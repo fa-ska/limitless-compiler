@@ -36,7 +36,7 @@ jobs:
       - name: Toolchain Setup
         run: |
           mkdir -p $HOME/toolchain
-          # Pakai Eva GCC: Mirror stabil untuk menghindari error libc
+          # Download Eva GCC (Pastikan baris ini lengkap sampai ujung -xz)
           curl -LSs "https://github.com/mvaisakh/gcc-arm64/archive/refs/heads/master.tar.gz" | tar -C $HOME/toolchain --strip-components=1 -xz
 
       - name: Source, Patching & Compilation
@@ -69,6 +69,7 @@ jobs:
           make -j$(nproc --all) O=out ARCH=arm64 \
             CROSS_COMPILE=aarch64-elf- \
             CROSS_COMPILE_ARM32=arm-eabi-
+
 
       - name: Packing
         run: |
