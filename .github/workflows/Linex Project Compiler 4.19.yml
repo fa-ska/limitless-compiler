@@ -22,20 +22,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Environment & Swap
+      - name: Environment Setup
         run: |
           sudo apt-get update
-          # Menghapus paket bermasalah & menambahkan libelf-dev (penting untuk kernel 4.19+)
           sudo apt-get install -y --no-install-recommends \
             bc bison build-essential curl flex git git-core gnupg gperf \
             libssl-dev libxml2-utils lzop make zip zstd python3 ca-certificates \
-            clang lld llvm device-tree-compiler libelf-dev
-          
-          # Buat Swap baru 16GB
-          sudo fallocate -l 16G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
+            clang lld llvm gcc-arm-linux-gnueabi gcc-aarch64-linux-gnu
+
+
 
       - name: Toolchain Setup
         run: |
