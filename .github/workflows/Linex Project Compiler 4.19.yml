@@ -51,9 +51,15 @@ jobs:
           export KBUILD_BUILD_USER="linex"
           export KBUILD_BUILD_HOST="fa_ska"
           
-          # Menggunakan path vendor/ karena lokasi defconfig di repo ThRE-Team ada di sana
-          make O=out ARCH=arm64 ${{ inputs.kernel-config }}
+          # Buat folder out dulu
+          mkdir -p out
           
+          # Cara penggabungan config yang benar untuk fragment
+          ARCH=arm64 scripts/kconfig/merge_config.sh -O out \
+            arch/arm64/configs/vendor/sdm845-perf_defconfig \
+            arch/arm64/configs/xiaomi/beryllium.config
+          
+          # Mulai kompilasi menggunakan config yang sudah digabung
           make -j$(nproc --all) O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
