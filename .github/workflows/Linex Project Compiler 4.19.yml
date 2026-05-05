@@ -13,7 +13,7 @@ on:
         default: 'lineage-23.2_xiaomi'
       kernel-config:
         description: 'Defconfig'
-        default: 'vendor/sdm845-perf_defconfig xiaomi/beryllium.config'
+        default: 'vendor/sdm845-perf_defconfig vendor/xiaomi/beryllium.config'
 
 jobs:
   build:
@@ -58,7 +58,7 @@ jobs:
           # Kita pakai path lengkap agar tidak "File not found" lagi
           ARCH=arm64 ./scripts/kconfig/merge_config.sh -O out \
             arch/arm64/configs/vendor/sdm845-perf_defconfig \
-            arch/arm64/configs/xiaomi/beryllium.config
+            arch/arm64/configs/vendor/xiaomi/beryllium.config
           
           # Mulai build dengan LLVM=1 (Assembler Clang aktif)
           make -j$(nproc --all) O=out ARCH=arm64 \
