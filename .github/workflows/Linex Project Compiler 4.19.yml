@@ -11,9 +11,6 @@ on:
       kernel-branch:
         description: 'Branch'
         default: 'lineage-23.2_xiaomi'
-      kernel-config:
-        description: 'Defconfig'
-        default: 'vendor/sdm845-perf_defconfig vendor/xiaomi/beryllium.config'       
 
 jobs:
   build:
@@ -41,46 +38,46 @@ jobs:
         run: |
           git clone --depth=1 ${{ inputs.kernel-url }} -b ${{ inputs.kernel-branch }} kernel
           cd kernel
-          # Memasang KernelSU-Next branch 'next'
           curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
 
       - name: Compilation
         working-directory: kernel
         run: |
-          # Setup Environment
           export PATH="$HOME/clang/bin:$HOME/gcc64/bin:$HOME/gcc32/bin:$PATH"
           export KBUILD_BUILD_USER="fa_s_ka"
           export KBUILD_BUILD_HOST="linext"
           
           mkdir -p out
           
-          # 1. Merge Config (Path sesuai screenshot 7558.png)
+          # Merge Config dengan jalur yang sudah diverifikasi (vendor/xiaomi/)
           ARCH=arm64 ./scripts/kconfig/merge_config.sh -O out \
             arch/arm64/configs/vendor/sdm845-perf_defconfig \
             arch/arm64/configs/vendor/xiaomi/beryllium.config
           
-          # 2. Build Utama (Mixed GCC/Clang Mode)
-          # LLVM_IAS=0 digunakan untuk fix error 'junk at end of line' di vgettimeofday
+          # Build dengan pemaksaan Linker & Assembler GCC (untuk fix vgettimeofday)
           make -j$(nproc --all) O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-android- \
             CROSS_COMPILE_ARM32=arm-linux-androideabi- \
-            HOSTCC=gcc \
-            HOSTCXX=g++ \
+            LD=aarch64-linux-android-ld \
+            AR=llvm-ar \
+            NM=llvm-nm \
+            OBJCOPY=llvm-objcopy \
+            OBJDUMP=llvm-objdump \
+            STRIP=llvm-strip \
+            OBJSIZE=llvm-size \
+            V=0 \
             LLVM=1 \
-            LLVM_IAS=0 \
-            LD=aarch64-linux-android-ld
+            LLVM_IAS=0
 
-      - name: Packing Flashable Zip
+      - name: Packing
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3 AnyKernel3
-          # Salin hasil build (Image.gz-dtb atau Image)
           find kernel/out/arch/arm64/boot/ -name "Image*" -exec cp {} AnyKernel3/ \;
-          # Salin DTBO jika ada
           [ -f kernel/out/arch/arm64/boot/dtbo.img ] && cp kernel/out/arch/arm64/boot/dtbo.img AnyKernel3/
 
-      - name: Upload Artifact
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.name }}
