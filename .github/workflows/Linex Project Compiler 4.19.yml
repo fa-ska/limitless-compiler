@@ -4,16 +4,16 @@ on:
     inputs:
       name:
         description: 'Nama Hasil Build'
-        default: '4.19_kernel_beryllium'
+        default: '4.19_kernel_beryllium_fa_ska'
       kernel-url:
         description: 'URL Repo Kernel'
-        default: 'https://github.com/ThRE-Team/android_kernel_xiaomi_sdm845_419'
+        default: 'https://github.com/fa-ska/4.19_android_kernel_xiaomi_sdm845'
       kernel-branch:
         description: 'Branch'
-        default: 'lineage-23.2_xiaomi'
+        default: 'rebase'
       base-defconfig:
         description: 'Base Defconfig'
-        default: 'vendor/sdm845-perf_defconfig'
+        default: 'sdm845-perf_defconfig'
       device-defconfig:
         description: 'Device Config'
         default: 'vendor/xiaomi/beryllium.config'
@@ -46,14 +46,14 @@ jobs:
           cd kernel
           curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
           
-          # --- OPERASI TOTAL PEMBERSIHAN VDSO ---
-          # 1. Hapus isi folder vdso agar tidak ada file assembly yang bisa dikompilasi
+          # --- JURUS PENGHANCUR ERROR VDSO ---
+          # Menghapus isi folder agar Clang tidak menemukan file assembly yang 'junk'
           rm -rf arch/arm64/kernel/vdso/*
-          # 2. Buat Makefile kosong di dalam folder tersebut agar build tidak error saat mencari file
           echo "obj-y :=" > arch/arm64/kernel/vdso/Makefile
-          # 3. Matikan referensi VDSO di Makefile utama dengan lebih presisi
-          sed -i 's/obj-$(CONFIG_VDSO).*+=/ # obj-$(CONFIG_VDSO) +=/g' arch/arm64/kernel/Makefile || true
+          
+          # Mematikan referensi VDSO di Makefile utama
           sed -i 's/obj-y.*+=.*vdso\// # obj-y += vdso\//g' arch/arm64/kernel/Makefile || true
+          sed -i 's/obj-$(CONFIG_VDSO).*+=/ # obj-$(CONFIG_VDSO) +=/g' arch/arm64/kernel/Makefile || true
 
       - name: Compilation
         run: |
@@ -64,12 +64,12 @@ jobs:
           
           mkdir -p out
           
-          # Merge Config dengan input manual kawan
+          # Merge Config dengan input manual
           ARCH=arm64 ./scripts/kconfig/merge_config.sh -O out \
             arch/arm64/configs/${{ inputs.base-defconfig }} \
             arch/arm64/configs/${{ inputs.device-defconfig }}
           
-          # Build dengan pemaksaan penuh ke GCC Assembler
+          # Build dengan Mixed GCC/Clang (LLVM_IAS=0 wajib untuk kernel 4.19)
           make -j$(nproc --all) O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
