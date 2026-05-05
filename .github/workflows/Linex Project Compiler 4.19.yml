@@ -1,4 +1,4 @@
-name: Linex Project Compiler 4.19 Optimized
+name: Linex Project Compiler 4.19 Optimized Pro
 on:
   workflow_dispatch:
     inputs:
@@ -36,33 +36,30 @@ jobs:
       - name: Toolchain Setup
         run: |
           mkdir -p $HOME/clang $HOME/gcc64 $HOME/gcc32
-          curl -LSs "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r530567.tar.gz" | tar -C $HOME/clang -xz
-          curl -LSs "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/0a0604336d4d1067aa1aaef8d3779b31fcee841d.tar.gz" | tar -C $HOME/gcc64 -xz
-          curl -LSs "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/+archive/4d16d93f49c2b5ecdd0f12c38d194835dd595603.tar.gz" | tar -C $HOME/gcc32 -xz
+          # Menggunakan AOSP Clang r416183b - Standar emas untuk Kernel 4.19
+          curl -LSs "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r416183b.tar.gz" | tar -C $HOME/clang -xz
+          # GCC 4.9 untuk menangani assembly yang sensitif
+          curl -LSs "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/tags/android-12.1.0_r27/aarch64-linux-android-4.9.tar.gz" | tar -C $HOME/gcc64 -xz
+          curl -LSs "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/+archive/refs/tags/android-12.1.0_r27/arm-linux-androideabi-4.9.tar.gz" | tar -C $HOME/gcc32 -xz
 
       - name: Source & Patching
         run: |
-          git clone --depth=1 ${{ inputs.kernel-url }} -b ${{ inputs.kernel-branch }} kernel
+          # Clone dengan --recursive untuk menarik submodule techpack
+          git clone --recursive --depth=1 ${{ inputs.kernel-url }} -b ${{ inputs.kernel-branch }} kernel
           cd kernel
           
           # Setup KernelSU-Next
           curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
           
-          # --- JURUS SEDERHANA: BYPASS SEMUA ERROR (VDSO & TECHPACK) ---
-          # Matikan VDSO di Makefile agar tidak disentuh compiler
-          sed -i 's/obj-y.*+=.*vdso\// #/g' arch/arm64/kernel/Makefile || true
-          
-          # Matikan Techpack agar tidak mencari folder yang hilang (7632.png)
-          sed -i 's/obj-y += techpack\// #/g' Makefile || true
-          sed -i 's/source "techpack\/Kconfig"/# /g' Kconfig || true
-          
-          # Buat file dummy 'kosongan' biar sistem tidak teriak error
-          mkdir -p out/arch/arm64/kernel/vdso/
-          touch out/arch/arm64/kernel/vdso/vdso-offsets.h
+          # --- FIX TECHPACK (Jaga-jaga jika submodule tetap kosong) ---
+          if [ ! -d "techpack/mi845" ]; then
+            echo "Techpack mi845 tidak ditemukan, melakukan bypass..."
+            sed -i 's/source "techpack\/Kconfig"/# /g' Kconfig || true
+            sed -i 's/obj-y += techpack\// # /g' Makefile || true
+          fi
 
       - name: Compilation
         run: |
-          # Masuk ke folder kernel dan jalankan build
           cd kernel
           export PATH="$HOME/clang/bin:$HOME/gcc64/bin:$HOME/gcc32/bin:$PATH"
           export KBUILD_BUILD_USER="fa_s_ka"
@@ -75,7 +72,7 @@ jobs:
             arch/arm64/configs/${{ inputs.base-defconfig }} \
             arch/arm64/configs/${{ inputs.device-defconfig }}
           
-          # Build (LLVM_IAS=0 adalah koentji!)
+          # Build dengan Mixed GCC/Clang (Standard Professional)
           make -j$(nproc --all) O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
@@ -83,13 +80,18 @@ jobs:
             CROSS_COMPILE_ARM32=arm-linux-androideabi- \
             LD=aarch64-linux-android-ld \
             AS=aarch64-linux-android-as \
+            AR=llvm-ar \
+            NM=llvm-nm \
+            OBJCOPY=llvm-objcopy \
+            OBJDUMP=llvm-objdump \
+            STRIP=llvm-strip \
             LLVM=1 \
             LLVM_IAS=0
-
 
       - name: Packing
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3 AnyKernel3
+          # Mengambil Image kernel yang berhasil di-build
           find kernel/out/arch/arm64/boot/ -name "Image*" -exec cp {} AnyKernel3/ \;
           [ -f kernel/out/arch/arm64/boot/dtbo.img ] && cp kernel/out/arch/arm64/boot/dtbo.img AnyKernel3/
 
