@@ -36,12 +36,16 @@ jobs:
       - name: Toolchain Setup
         run: |
           mkdir -p $HOME/clang $HOME/gcc64 $HOME/gcc32
-          # Download Clang r416183b pakai wget agar lebih stabil
-          wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r416183b.tar.gz -O clang.tar.gz
-          tar -C $HOME/clang -xzf clang.tar.gz
-          # Download GCC 4.9 dari Lineage Mirror
+          
+          # Pakai Proton Clang - Ini toolchain favorit dev Poco F1 (beryllium)
+          # Jauh lebih stabil dan gampang di-download di GitHub Actions
+          wget -q https://github.com/kdrag0n/proton-clang/archive/refs/heads/master.tar.gz -O clang.tar.gz
+          tar -C $HOME/clang --strip-components=1 -xzf clang.tar.gz
+          
+          # GCC 4.9 dari repo yang lebih "ikhlas" kasih download
           wget -q https://github.com/lineage-targets/arm64-gcc/archive/refs/heads/master.tar.gz -O gcc64.tar.gz
           tar -C $HOME/gcc64 --strip-components=1 -xzf gcc64.tar.gz
+          
           wget -q https://github.com/lineage-targets/arm-gcc/archive/refs/heads/master.tar.gz -O gcc32.tar.gz
           tar -C $HOME/gcc32 --strip-components=1 -xzf gcc32.tar.gz
 
