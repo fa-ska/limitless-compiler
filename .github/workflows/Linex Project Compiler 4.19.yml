@@ -4,16 +4,13 @@ on:
     inputs:
       name:
         description: 'Nama Hasil Build'
-        default: '4.19_kernel'
+        default: '4.19_kernel_beryllium'
       kernel-url:
         description: 'URL Repo Kernel'
         default: 'https://github.com/ThRE-Team/android_kernel_xiaomi_sdm845_419'
       kernel-branch:
         description: 'Branch'
         default: 'lineage-23.2_xiaomi'
-      kernel-config:
-        description: 'Defconfig'
-        default: 'vendor/sdm845-perf_defconfig vendor/xiaomi/beryllium.config'
 
 jobs:
   build:
@@ -32,9 +29,8 @@ jobs:
 
       - name: Toolchain Setup
         run: |
-          mkdir -p $HOME/clang
+          mkdir -p $HOME/clang $HOME/gcc64 $HOME/gcc32
           curl -LSs "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r530567.tar.gz" | tar -C $HOME/clang -xz
-          mkdir -p $HOME/gcc64 $HOME/gcc32
           curl -LSs "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/0a0604336d4d1067aa1aaef8d3779b31fcee841d.tar.gz" | tar -C $HOME/gcc64 -xz
           curl -LSs "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/+archive/4d16d93f49c2b5ecdd0f12c38d194835dd595603.tar.gz" | tar -C $HOME/gcc32 -xz
 
@@ -42,25 +38,26 @@ jobs:
         run: |
           git clone --depth=1 ${{ inputs.kernel-url }} -b ${{ inputs.kernel-branch }} kernel
           cd kernel
+          # Memasang KernelSU-Next branch 'next'
           curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
 
       - name: Compilation
         working-directory: kernel
-      - name: Compilation
-        working-directory: kernel
         run: |
+          # Setup Environment
           export PATH="$HOME/clang/bin:$HOME/gcc64/bin:$HOME/gcc32/bin:$PATH"
           export KBUILD_BUILD_USER="fa_s_ka"
-          export KBUILD_BUILD_HOST="linex"
+          export KBUILD_BUILD_HOST="linext"
           
           mkdir -p out
           
-          # 1. Merge Config
+          # 1. Merge Config (Path sesuai screenshot 7558.png)
           ARCH=arm64 ./scripts/kconfig/merge_config.sh -O out \
             arch/arm64/configs/vendor/sdm845-perf_defconfig \
             arch/arm64/configs/vendor/xiaomi/beryllium.config
           
-          # 2. Build dengan "Mixed GCC/Clang" (Cara paling stabil buat 4.19)
+          # 2. Build Utama (Mixed GCC/Clang Mode)
+          # LLVM_IAS=0 digunakan untuk fix error 'junk at end of line' di vgettimeofday
           make -j$(nproc --all) O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
@@ -70,22 +67,18 @@ jobs:
             HOSTCXX=g++ \
             LLVM=1 \
             LLVM_IAS=0 \
-            LD=aarch64-linux-android-ld \
-            AR=llvm-ar \
-            NM=llvm-nm \
-            OBJCOPY=llvm-objcopy \
-            OBJDUMP=llvm-objdump \
-            STRIP=llvm-strip
+            LD=aarch64-linux-android-ld
 
-      - name: Packing
+      - name: Packing Flashable Zip
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3 AnyKernel3
+          # Salin hasil build (Image.gz-dtb atau Image)
           find kernel/out/arch/arm64/boot/ -name "Image*" -exec cp {} AnyKernel3/ \;
+          # Salin DTBO jika ada
           [ -f kernel/out/arch/arm64/boot/dtbo.img ] && cp kernel/out/arch/arm64/boot/dtbo.img AnyKernel3/
 
-      - name: Upload
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.name }}
           path: AnyKernel3/*
-
