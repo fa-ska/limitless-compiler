@@ -36,16 +36,13 @@ jobs:
       - name: Toolchain Setup
         run: |
           mkdir -p $HOME/clang $HOME/gcc64 $HOME/gcc32
-          # Download Clang r416183b via Direct Link (Anti-Login)
-          wget -q https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r416183b.tar.gz -O clang.tar.gz
-          tar -C $HOME/clang -xzf clang.tar.gz
+          
+          # Download Clang r416183b (Direct Link GitLab - Anti Login)
+          curl -LSs "https://gitlab.com/stefan_m0/clang-r416183b/-/archive/master/clang-r416183b-master.tar.gz" | tar -C $HOME/clang --strip-components=1 -xz
 
-          # Download GCC 4.9 via Direct Link (LineageOS Official Mirror)
-          wget -q https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9/archive/refs/heads/lineage-18.1.tar.gz -O gcc64.tar.gz
-          tar -C $HOME/gcc64 --strip-components=1 -xzf gcc64.tar.gz
-
-          wget -q https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9/archive/refs/heads/lineage-18.1.tar.gz -O gcc32.tar.gz
-          tar -C $HOME/gcc32 --strip-components=1 -xzf gcc32.tar.gz
+          # Download GCC 4.9 (Direct Link GitLab - Lebih stabil dari GitHub Mirror)
+          curl -LSs "https://gitlab.com/stefan_m0/gcc-arm64/-/archive/master/gcc-arm64-master.tar.gz" | tar -C $HOME/gcc64 --strip-components=1 -xz
+          curl -LSs "https://gitlab.com/stefan_m0/gcc-arm/-/archive/master/gcc-arm-master.tar.gz" | tar -C $HOME/gcc32 --strip-components=1 -xz
 
       - name: Source & Patching
         run: |
@@ -64,20 +61,18 @@ jobs:
           export KBUILD_BUILD_USER="fa_s_ka"
           export KBUILD_BUILD_HOST="linext"
           mkdir -p out
+          
           ARCH=arm64 ./scripts/kconfig/merge_config.sh -O out \
             arch/arm64/configs/${{ inputs.base-defconfig }} \
             arch/arm64/configs/${{ inputs.device-defconfig }}
+          
+          # Gunakan Clang + GCC kombinasi (Standard AOSP)
           make -j$(nproc --all) O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-android- \
             CROSS_COMPILE_ARM32=arm-linux-androideabi- \
             LD=ld.lld \
-            AR=llvm-ar \
-            NM=llvm-nm \
-            OBJCOPY=llvm-objcopy \
-            OBJDUMP=llvm-objdump \
-            STRIP=llvm-strip \
             LLVM_IAS=0
 
       - name: Packing
