@@ -42,18 +42,23 @@ jobs:
 
       - name: Source & Patching
         run: |
+          # Clone dengan --recursive untuk jaga-jaga ada submodule techpack
           git clone --depth=1 ${{ inputs.kernel-url }} -b ${{ inputs.kernel-branch }} kernel
           cd kernel
+          
+          # Setup KernelSU-Next
           curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
           
-          # --- JURUS PENGHANCUR ERROR VDSO ---
-          # Menghapus isi folder agar Clang tidak menemukan file assembly yang 'junk'
+          # --- JURUS AMPUTASI VDSO (SUDAH BERHASIL) ---
           rm -rf arch/arm64/kernel/vdso/*
           echo "obj-y :=" > arch/arm64/kernel/vdso/Makefile
-          
-          # Mematikan referensi VDSO di Makefile utama
           sed -i 's/obj-y.*+=.*vdso\// # obj-y += vdso\//g' arch/arm64/kernel/Makefile || true
-          sed -i 's/obj-$(CONFIG_VDSO).*+=/ # obj-$(CONFIG_VDSO) +=/g' arch/arm64/kernel/Makefile || true
+          
+          # --- JURUS FIX TECHPACK (MASALAH BARU 7632.png) ---
+          # Kita beri komentar (#) pada baris yang memanggil techpack di Kconfig utama
+          sed -i 's/source "techpack\/Kconfig"/# source "techpack\/Kconfig"/g' Kconfig || true
+          # Kita matikan juga di Makefile utama agar tidak dicompile
+          sed -i 's/obj-y += techpack\// # obj-y += techpack\//g' Makefile || true
 
       - name: Compilation
         run: |
