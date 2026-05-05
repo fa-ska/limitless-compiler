@@ -47,15 +47,16 @@ jobs:
           # 2. Patching (KernelSU & Stability Fix)
           curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
           
+          # Fix Techpack & Drivers (Sering bikin error di 4.19)
           if [ ! -d "techpack/mi845" ]; then
             sed -i 's/source "techpack\/Kconfig"/# /g' Kconfig || true
             sed -i 's/obj-y += techpack\// # /g' Makefile || true
           fi
           
-          # Fix multiple definition of yylloc
+          # Fix multiple definition of yylloc (GCC 10+)
           sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' scripts/dtc/dtc-lexer.lex.c_shipped || true
 
-          # 3. Masak Kernel (Dengan Mode Sabar / Permissive)
+          # 3. Masak Kernel (The Ultimate Stability Mode)
           export PATH="$HOME/toolchain/bin:$PATH"
           export KBUILD_BUILD_USER="fa_s_ka"
           export KBUILD_BUILD_HOST="linext"
@@ -65,16 +66,23 @@ jobs:
             arch/arm64/configs/${{ inputs.base-defconfig }} \
             arch/arm64/configs/${{ inputs.device-defconfig }}
           
-          # KCFLAGS="-w -fpermissive" adalah kunci buat nembus error IPA tadi
+          # KCFLAGS rahasia untuk menembus error drivers/soc/qcom dan IPA
           make -j$(nproc --all) O=out ARCH=arm64 \
             CROSS_COMPILE=aarch64-elf- \
             CROSS_COMPILE_ARM32=arm-eabi- \
-            KCFLAGS="-w -fpermissive"
+            KCFLAGS="-w -fpermissive -fno-stack-protector -Wno-error" \
+            KCPPFLAGS="-D__ASSEMBLY__"
 
       - name: Packing
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3 AnyKernel3
-          find kernel/out/arch/arm64/boot/ -name "Image*" -exec cp {} AnyKernel3/ \;
+          # Cek hasil Image
+          if [ -f kernel/out/arch/arm64/boot/Image.gz-dtb ]; then
+            cp kernel/out/arch/arm64/boot/Image.gz-dtb AnyKernel3/Image.gz-dtb
+          elif [ -f kernel/out/arch/arm64/boot/Image ]; then
+            cp kernel/out/arch/arm64/boot/Image AnyKernel3/Image
+          fi
+          # Cek hasil DTBO
           [ -f kernel/out/arch/arm64/boot/dtbo.img ] && cp kernel/out/arch/arm64/boot/dtbo.img AnyKernel3/
 
       - name: Upload
