@@ -7,7 +7,7 @@ on:
         default: '4.19_kernel'
       kernel-url:
         description: 'URL Repo Kernel'
-        default: 'https://github.com/linex-17/Limitless.git'
+        default: 'https://github.com/'
       kernel-branch:
         description: 'Branch'
         default: 'main'
@@ -29,10 +29,6 @@ jobs:
             bc bison build-essential curl flex git git-core gnupg gperf \
             libssl-dev libxml2-utils lzop make zip zstd python3 ca-certificates \
             clang lld llvm gcc-arm-linux-gnueabi gcc-aarch64-linux-gnu
-          
-          # Swap 16GB
-          sudo fallocate -l 16G /swapfile && sudo chmod 600 /swapfile
-          sudo mkswap /swapfile && sudo swapon /swapfile
 
       - name: Toolchain Setup
         run: |
@@ -45,12 +41,6 @@ jobs:
           curl -LSs "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/0a0604336d4d1067aa1aaef8d3779b31fcee841d.tar.gz" | tar -C $HOME/gcc64 -xz
           curl -LSs "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/+archive/4d16d93f49c2b5ecdd0f12c38d194835dd595603.tar.gz" | tar -C $HOME/gcc32 -xz
 
-      - name: Source & KernelSU
-        run: |
-          git clone --depth=1 ${{ inputs.kernel-url }} -b ${{ inputs.kernel-branch }} kernel
-          cd kernel
-          # Setup KernelSU-Next
-          curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
 
       - name: Compilation
         working-directory: kernel
