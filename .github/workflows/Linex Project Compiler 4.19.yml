@@ -35,8 +35,9 @@ jobs:
 
       - name: Toolchain Setup
         run: |
-          # Clone Proton Clang - All in One (Clang + GCC internal)
-          git clone --depth=1 https://gitlab.com/kdrag0n/proton-clang.git $HOME/clang
+          mkdir -p $HOME/clang
+          # Pakai Direct Download agar tidak minta Login/Username
+          curl -LSs "https://gitlab.com/kdrag0n/proton-clang/-/archive/master/proton-clang-master.tar.gz" | tar -C $HOME/clang --strip-components=1 -xz
 
       - name: Source & Patching
         run: |
@@ -64,7 +65,7 @@ jobs:
             arch/arm64/configs/${{ inputs.base-defconfig }} \
             arch/arm64/configs/${{ inputs.device-defconfig }}
           
-          # Build pakai Proton (LLVM_IAS=0 untuk kestabilan)
+          # Build pakai Proton (LLVM_IAS=0 wajib untuk kernel 4.19)
           make -j$(nproc --all) O=out ARCH=arm64 \
             CC=clang \
             CROSS_COMPILE=aarch64-linux-gnu- \
