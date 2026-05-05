@@ -13,7 +13,7 @@ on:
         default: 'lineage-23.2_xiaomi'
       kernel-config:
         description: 'Defconfig (Gunakan spasi jika lebih dari satu)'
-        default: 'sdm845-perf_defconfig xiaomi/beryllium.config'
+        default: 'vendor/sdm845-perf_defconfig xiaomi/beryllium.config'
 
 jobs:
   build:
@@ -53,22 +53,25 @@ jobs:
 
       - name: Compilation
         working-directory: kernel
+      - name: Compilation
+        working-directory: kernel
         run: |
-          # Set Path
           export PATH="$HOME/clang/bin:$HOME/gcc64/bin:$HOME/gcc32/bin:$PATH"
           export KBUILD_BUILD_USER="linex"
           export KBUILD_BUILD_HOST="fa_ska"
           
-          # Gabungkan Defconfig (Mendukung Fragmented Config)
-          make O=out ARCH=arm64 ${{ inputs.kernel-config }}
+          # Path Defconfig
+          make O=out ARCH=arm64 vendor/sdm845-perf_defconfig
+          make O=out ARCH=arm64 xiaomi/beryllium.config
           
-          # Mulai Kompilasi Kernel
+          # Lanjutkan build
           make -j$(nproc --all) O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-android- \
             CROSS_COMPILE_ARM32=arm-linux-androideabi- \
             LLVM=1 LLVM_IAS=1
+
 
       - name: Check Results
         run: |
