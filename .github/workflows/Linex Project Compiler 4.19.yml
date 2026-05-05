@@ -28,7 +28,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             bc bison build-essential curl flex git git-core gnupg gperf \
             libssl-dev libxml2-utils lzop make zip zstd python3 ca-certificates \
-            clang lld llvm aarch64-linux-gnu-gcc device-tree-compiler
+            clang lld llvm gcc-arm-linux-gnueabi gcc-aarch64-linux-gnu
           
           # Swap 16GB
           sudo fallocate -l 16G /swapfile && sudo chmod 600 /swapfile
