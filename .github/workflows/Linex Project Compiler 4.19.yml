@@ -48,16 +48,16 @@ jobs:
           # Setup KernelSU-Next
           curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
           
-          # --- JURUS ANTI-VDSO TOTAL (BYPASS JALUR) ---
-          # Kita buat file dummy agar sistem build mengira vgettimeofday sudah selesai dibuat
-          mkdir -p out/arch/arm64/kernel/vdso/
-          touch out/arch/arm64/kernel/vdso/vdso-offsets.h
+          # --- JURUS PENYAMARAN VDSO (ANTI-JUNK 7666.png) ---
+          # 1. Kita kosongkan isi file assembly yang menyebabkan junk error
+          # Dengan file kosong, compiler tidak akan menemukan karakter aneh
+          echo "/* Empty VDSO */" > arch/arm64/kernel/vdso/gettimeofday.S
+          echo "/* Empty VDSO */" > arch/arm64/kernel/vdso/vgettimeofday.S
+          echo "/* Empty VDSO */" > arch/arm64/kernel/vdso/note.S
+          echo "/* Empty VDSO */" > arch/arm64/kernel/vdso/sigreturn.S
           
-          # Matikan jalur VDSO di Makefile utama agar tidak dikompilasi
-          sed -i 's/obj-y.*+=.*vdso\// # obj-y += vdso\//g' arch/arm64/kernel/Makefile || true
-          sed -i 's/vdso_prepare:.*//g' arch/arm64/kernel/Makefile || true
-          # Tambahkan baris kosong agar make tidak bingung
-          echo "vdso_prepare:" >> arch/arm64/kernel/Makefile
+          # 2. Tetap matikan flag stack-protector di VDSO sebagai jaga-jaga
+          sed -i 's/-mstack-protector-guard=sysreg//g' arch/arm64/kernel/vdso/Makefile || true
 
           # --- JURUS FIX TECHPACK ---
           [ -f Kconfig ] && sed -i 's/source "techpack\/Kconfig"/# source "techpack\/Kconfig"/g' Kconfig || true
