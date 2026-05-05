@@ -42,20 +42,20 @@ jobs:
 
       - name: Source & Patching
         run: |
-          # Clone ke folder 'kernel'
           git clone --depth=1 ${{ inputs.kernel-url }} -b ${{ inputs.kernel-branch }} kernel
           cd kernel
           
           # Setup KernelSU-Next
           curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
           
-          # --- JURUS AMPUTASI VDSO (SUDAH BERHASIL) ---
-          rm -rf arch/arm64/kernel/vdso/*
-          echo "obj-y :=" > arch/arm64/kernel/vdso/Makefile
-          sed -i 's/obj-y.*+=.*vdso\// # obj-y += vdso\//g' arch/arm64/kernel/Makefile || true
+          # --- JURUS ANTI-ERROR VDSO VERSI FINAL ---
+          # 1. Matikan flag stack-protector yang bikin junk error di VDSO
+          sed -i 's/-mstack-protector-guard=sysreg//g' arch/arm64/kernel/vdso/Makefile || true
           
-          # --- JURUS FIX TECHPACK (MASALAH LOG 7632.png) ---
-          # Pastikan file Kconfig ada sebelum di-sed
+          # 2. Tambahkan flag agar compiler tidak cerewet soal assembly di VDSO
+          sed -i 's/VDSO_LDFLAGS += -shared/VDSO_LDFLAGS += -shared -N/g' arch/arm64/kernel/vdso/Makefile || true
+
+          # --- JURUS FIX TECHPACK ---
           [ -f Kconfig ] && sed -i 's/source "techpack\/Kconfig"/# source "techpack\/Kconfig"/g' Kconfig || true
           [ -f Makefile ] && sed -i 's/obj-y += techpack\// # obj-y += techpack\//g' Makefile || true
 
