@@ -35,17 +35,14 @@ jobs:
 
       - name: Toolchain Setup
         run: |
-          mkdir -p $HOME/clang
-          # Pakai Direct Download agar tidak minta Login/Username
-          curl -LSs "https://gitlab.com/kdrag0n/proton-clang/-/archive/master/proton-clang-master.tar.gz" | tar -C $HOME/clang --strip-components=1 -xz
+          # Pakai repo GitHub (Public) biar ga drama minta login/error gzip
+          git clone --depth=1 https://github.com/kdrag0n/proton-clang.git $HOME/clang
 
       - name: Source & Patching
         run: |
           git clone --recursive --depth=1 ${{ inputs.kernel-url }} -b ${{ inputs.kernel-branch }} kernel
           cd kernel
-          # Setup KernelSU-Next
           curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
-          # Bypass Techpack jika folder kosong
           if [ ! -d "techpack/mi845" ]; then
             sed -i 's/source "techpack\/Kconfig"/# /g' Kconfig || true
             sed -i 's/obj-y += techpack\// # /g' Makefile || true
@@ -57,19 +54,15 @@ jobs:
           export PATH="$HOME/clang/bin:$PATH"
           export KBUILD_BUILD_USER="fa_s_ka"
           export KBUILD_BUILD_HOST="linext"
-          
           mkdir -p out
-          
-          # Merge Config
           ARCH=arm64 ./scripts/kconfig/merge_config.sh -O out \
             arch/arm64/configs/${{ inputs.base-defconfig }} \
             arch/arm64/configs/${{ inputs.device-defconfig }}
-          
-          # Build pakai Proton (LLVM_IAS=0 wajib untuk kernel 4.19)
           make -j$(nproc --all) O=out ARCH=arm64 \
             CC=clang \
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+            LLVM=1 \
             LLVM_IAS=0
 
       - name: Packing
