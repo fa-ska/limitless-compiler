@@ -35,8 +35,11 @@ jobs:
 
       - name: Toolchain Setup
         run: |
-          # Pakai repo GitHub (Public) biar ga drama minta login/error gzip
-          git clone --depth=1 https://github.com/kdrag0n/proton-clang.git $HOME/clang
+          # Pakai AOSP Clang 12.0 (Sangat stabil untuk Kernel 4.19 SDM845)
+          git clone --depth=1 https://github.com/LineageOS/android_prebuilts_clang_host_linux-x86_clang-r416183b.git $HOME/clang
+          # Pakai GCC resmi dari AOSP
+          git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9.git $HOME/gcc64
+          git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9.git $HOME/gcc32
 
       - name: Source & Patching
         run: |
@@ -51,18 +54,30 @@ jobs:
       - name: Compilation
         run: |
           cd kernel
-          export PATH="$HOME/clang/bin:$PATH"
+          # Masukkan semua binari ke PATH
+          export PATH="$HOME/clang/bin:$HOME/gcc64/bin:$HOME/gcc32/bin:$PATH"
           export KBUILD_BUILD_USER="fa_s_ka"
           export KBUILD_BUILD_HOST="linext"
+          
           mkdir -p out
+          
+          # Merge Config
           ARCH=arm64 ./scripts/kconfig/merge_config.sh -O out \
             arch/arm64/configs/${{ inputs.base-defconfig }} \
             arch/arm64/configs/${{ inputs.device-defconfig }}
+          
+          # Build menggunakan kombinasi Clang + GCC (Paling aman buat SDM845)
           make -j$(nproc --all) O=out ARCH=arm64 \
             CC=clang \
-            CROSS_COMPILE=aarch64-linux-gnu- \
-            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-            LLVM=1 \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=aarch64-linux-android- \
+            CROSS_COMPILE_ARM32=arm-linux-androideabi- \
+            LD=ld.lld \
+            AR=llvm-ar \
+            NM=llvm-nm \
+            OBJCOPY=llvm-objcopy \
+            OBJDUMP=llvm-objdump \
+            STRIP=llvm-strip \
             LLVM_IAS=0
 
       - name: Packing
