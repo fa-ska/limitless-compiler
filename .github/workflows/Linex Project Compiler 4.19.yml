@@ -11,6 +11,9 @@ on:
       kernel-branch:
         description: 'Branch'
         default: 'lineage-23.2_xiaomi'
+      kernel-config:
+        description: 'Defconfig'
+        default: 'vendor/sdm845-perf_defconfig vendor/xiaomi/beryllium.config'       
 
 jobs:
   build:
