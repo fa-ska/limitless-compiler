@@ -1,8 +1,10 @@
-name: Linex Project 4.19 Optimized
-
+name: Linex Project Compiler 4.19 Optimized Pro
 on:
   workflow_dispatch:
     inputs:
+      name:
+        description: 'Nama Hasil Build'
+        default: '4.19_kernel_beryllium_fa_ska'
       kernel-url:
         description: 'URL Repo Kernel'
         default: 'https://github.com/fa-ska/4.19_android_kernel_xiaomi_sdm845'
@@ -11,10 +13,10 @@ on:
         default: 'rebase'
       base-defconfig:
         description: 'Base Defconfig'
-        default: 'sdm845-perf_defconfig'
+        default: 'beryllium_defconfig'
       device-defconfig:
         description: 'Device Config'
-        default: 'vendor/xiaomi/beryllium.config'
+        default: 'vendor/beryllium_config'
 
 jobs:
   build:
@@ -23,65 +25,68 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Environment
+      - name: Environment Setup
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential bc libssl-dev libelf-dev flex bison rsync zip
-          mkdir -p $GITHUB_WORKSPACE/toolchain
-          cd $GITHUB_WORKSPACE/toolchain
-          git clone --depth=1 https://github.com/mvaisakh/gcc-arm64 gcc64
-          git clone --depth=1 https://github.com/mvaisakh/gcc-arm gcc32
+          sudo apt-get install -y --no-install-recommends \
+            bc bison build-essential curl flex git git-core gnupg gperf \
+            libssl-dev libxml2-utils lzop make zip zstd python3 ca-certificates \
+            clang lld llvm device-tree-compiler libelf-dev wget libdebuginfod-dev
 
-      - name: Prepare Source
+      - name: Toolchain Setup
         run: |
-          cd $GITHUB_WORKSPACE
-          # Hapus folder source jika ada sisa kegagalan sebelumnya
-          rm -rf source
-          git clone --depth=1 ${{ github.event.inputs.kernel-url }} -b ${{ github.event.inputs.kernel-branch }} source
-          
-      - name: Fix Techpack & Merge Config
+          mkdir -p $HOME/toolchain
+          curl -LSs "https://github.com/mvaisakh/gcc-arm64/archive/refs/heads/master.tar.gz" | tar -C $HOME/toolchain --strip-components=1 -xz
+
+      - name: Source, Patching & Compilation
         run: |
-          cd $GITHUB_WORKSPACE/source
-          # Hapus techpack dari Kconfig & Makefile agar tidak error
-          find . -name "Kconfig" -exec sed -i '/techpack/d' {} +
-          find . -name "Makefile" -exec sed -i '/techpack/d' {} +
+          # 1. Ambil Source
+          git clone --recursive --depth=1 ${{ inputs.kernel-url }} -b ${{ inputs.kernel-branch }} kernel
+          cd kernel
           
-          # Buat folder output
+
+          # Fix Techpack & Drivers
+          if [ ! -d "techpack/mi845" ]; then
+            sed -i 's/source "techpack\/Kconfig"/# /g' Kconfig || true
+            sed -i 's/obj-y += techpack\// # /g' Makefile || true
+          fi
+          
+          # Fix multiple definition of yylloc
+          sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' scripts/dtc/dtc-lexer.lex.c_shipped || true
+
+          # 3. Masak Kernel
+          export PATH="$HOME/toolchain/bin:$PATH"
+          export KBUILD_BUILD_USER="fa_s_ka"
+          export KBUILD_BUILD_HOST="linext"
+          
           mkdir -p out
+          ARCH=arm64 ./scripts/kconfig/merge_config.sh -O out \
+            arch/arm64/configs/${{ inputs.base-defconfig }} \
+            arch/arm64/configs/${{ inputs.device-defconfig }}
           
-          # Jalankan merge_config dengan path yang benar (relatif terhadap folder source)
-          # Kita gunakan arch/arm64/configs/ sebagai base jika sdm845-perf_defconfig ada di sana
-          scripts/kconfig/merge_config.sh -O out \
-            arch/arm64/configs/${{ github.event.inputs.base-defconfig }} \
-            arch/arm64/configs/${{ github.event.inputs.device-defconfig }}
-
-      - name: Compilation
-        run: |
-          cd $GITHUB_WORKSPACE/source
-          export PATH=$GITHUB_WORKSPACE/toolchain/gcc64/bin:$PATH
-          export PATH=$GITHUB_WORKSPACE/toolchain/gcc32/bin:$PATH
+          # --- FIX FOR 7742.png (Pondasi dulu) ---
+          make O=out ARCH=arm64 CROSS_COMPILE=aarch64-elf- prepare -j1
+          
+          # --- GASPOL (Fix for 7740.png & 7737.png) ---
           make -j$(nproc --all) O=out ARCH=arm64 \
             CROSS_COMPILE=aarch64-elf- \
             CROSS_COMPILE_ARM32=arm-eabi- \
-            HOSTCC=gcc HOSTCXX=g++
+            KCFLAGS="-w -fpermissive -fno-stack-protector -D_FORTIFY_SOURCE=0 -Wno-error" \
+            KCPPFLAGS="-DASSEMBLY -D_FORTIFY_SOURCE=0"
 
-      - name: Packing & Upload
+      - name: Packing
         run: |
-          cd $GITHUB_WORKSPACE
-          if [ -f source/out/arch/arm64/boot/Image.gz-dtb ]; then
-            git clone --depth=1 https://github.com/osm0sis/AnyKernel3 AnyKernel
-            cp source/out/arch/arm64/boot/Image.gz-dtb AnyKernel/
-            cd AnyKernel
-            sed -i 's/do.devicecheck=1/do.devicecheck=0/g' anykernel.sh
-            sed -i 's/device.name1=maguro/device.name1=beryllium/g' anykernel.sh
-            zip -r9 Linex-Beryllium-Kernel.zip *
-            mv *.zip $GITHUB_WORKSPACE/
-          else
-            echo "Kompilasi Gagal, file tidak tercipta!" && exit 1
+          git clone --depth=1 https://github.com/osm0sis/AnyKernel3 AnyKernel3
+          # Cek hasil Image
+          if [ -f kernel/out/arch/arm64/boot/Image.gz-dtb ]; then
+            cp kernel/out/arch/arm64/boot/Image.gz-dtb AnyKernel3/Image.gz-dtb
+          elif [ -f kernel/out/arch/arm64/boot/Image ]; then
+            cp kernel/out/arch/arm64/boot/Image AnyKernel3/Image
           fi
+          [ -f kernel/out/arch/arm64/boot/dtbo.img ] && cp kernel/out/arch/arm64/boot/dtbo.img AnyKernel3/
 
-      - name: Upload Artifact
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel_Poco_F1
-          path: ./*.zip
+          name: ${{ inputs.name }}
+          path: AnyKernel3/*
