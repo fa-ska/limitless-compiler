@@ -37,7 +37,7 @@ jobs:
           cd $GITHUB_WORKSPACE
           git clone --depth=1 ${{ github.event.inputs.kernel-url }} -b ${{ github.event.inputs.kernel-branch }} source
           cd source
-          # Fix Kconfig error
+          # Fix error Kconfig techpack
           find . -name "Kconfig" -exec sed -i '/techpack/d' {} +
           # Merge Config
           scripts/kconfig/merge_config.sh ${{ github.event.inputs.base-defconfig }} ${{ github.event.inputs.device-defconfig }}
