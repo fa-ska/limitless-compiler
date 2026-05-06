@@ -44,10 +44,12 @@ jobs:
           git clone --recursive --depth=1 ${{ inputs.kernel-url }} -b ${{ inputs.kernel-branch }} kernel
           cd kernel
           
-          # 2. Patching (Fix DTC & Yylloc)
-          sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' scripts/dtc/dtc-lexer.lex.c_shipped || true
+          # 2. Patching Aman (Cek file dulu baru sed)
+          if [ -f scripts/dtc/dtc-lexer.lex.c_shipped ]; then
+            sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' scripts/dtc/dtc-lexer.lex.c_shipped
+          fi
           
-          # Matikan Techpack
+          # Matikan Techpack secara paksa agar tidak bentrok
           sed -i 's/source "techpack\/Kconfig"/# /g' Kconfig || true
           sed -i 's/obj-y += techpack\// # /g' Makefile || true
 
@@ -58,23 +60,20 @@ jobs:
           
           mkdir -p out
           
-          # Gabungkan defconfig
+          # Gunakan merge_config sesuai folder di 7824.png dan 7826.png
           ARCH=arm64 ./scripts/kconfig/merge_config.sh -O out \
             arch/arm64/configs/${{ inputs.base-defconfig }} \
             arch/arm64/configs/${{ inputs.device-defconfig }}
 
-          # Fix error 7846/7847: Tambahkan flag standar C dan HOSTCC
-          # Kita pakai -std=gnu11 agar compiler mengenali tipe data lama
-          make O=out ARCH=arm64 CROSS_COMPILE=aarch64-elf- \
-            HOSTCC="gcc -std=gnu11" \
-            HOSTCFLAGS="-D_GNU_SOURCE" prepare -j$(nproc --all)
+          # Fix Error 7849 (Atomic) & 7850: Tambahkan -fno-integrated-as dan standar gnu89
+          make O=out ARCH=arm64 CROSS_COMPILE=aarch64-elf- HOSTCC="gcc -std=gnu11" prepare -j$(nproc --all)
           
-          # Gaspol dengan tambahan flag -fcommon untuk hindari multiple definition
+          # Gaspol dengan KCFLAGS yang lebih kuat
           make -j$(nproc --all) O=out ARCH=arm64 \
             CROSS_COMPILE=aarch64-elf- \
             CROSS_COMPILE_ARM32=arm-eabi- \
             HOSTCC="gcc -std=gnu11" \
-            KCFLAGS="-w -fpermissive -fcommon -fno-stack-protector -D_FORTIFY_SOURCE=0 -Wno-error" \
+            KCFLAGS="-w -fpermissive -fcommon -fno-stack-protector -D_FORTIFY_SOURCE=0 -Wno-error -std=gnu89" \
             KCPPFLAGS="-D__ASSEMBLY__ -D_FORTIFY_SOURCE=0"
 
 
