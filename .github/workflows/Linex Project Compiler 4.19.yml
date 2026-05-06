@@ -42,13 +42,18 @@ jobs:
       - name: Fix Techpack & Merge Config
         run: |
           cd $GITHUB_WORKSPACE/source
-          # Paksa hapus techpack dari Kconfig agar tidak error 'No such file'
+          # Hapus techpack dari Kconfig & Makefile agar tidak error
           find . -name "Kconfig" -exec sed -i '/techpack/d' {} +
           find . -name "Makefile" -exec sed -i '/techpack/d' {} +
-          # Buat folder out secara manual agar tidak 'Does not exist'
+          
+          # Buat folder output
           mkdir -p out
-          # Jalankan merge config
-          scripts/kconfig/merge_config.sh O=out ${{ github.event.inputs.base-defconfig }} ${{ github.event.inputs.device-defconfig }}
+          
+          # Jalankan merge_config dengan path yang benar (relatif terhadap folder source)
+          # Kita gunakan arch/arm64/configs/ sebagai base jika sdm845-perf_defconfig ada di sana
+          scripts/kconfig/merge_config.sh -O out \
+            arch/arm64/configs/${{ github.event.inputs.base-defconfig }} \
+            arch/arm64/configs/${{ github.event.inputs.device-defconfig }}
 
       - name: Compilation
         run: |
