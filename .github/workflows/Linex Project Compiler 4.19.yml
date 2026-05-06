@@ -23,7 +23,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Environment & Toolchain
+      - name: Setup Environment
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential bc libssl-dev libelf-dev flex bison rsync zip
@@ -32,48 +32,51 @@ jobs:
           git clone --depth=1 https://github.com/mvaisakh/gcc-arm64 gcc64
           git clone --depth=1 https://github.com/mvaisakh/gcc-arm gcc32
 
-      - name: Clean Techpack & Prepare Source
+      - name: Prepare Source
         run: |
           cd $GITHUB_WORKSPACE
+          # Hapus folder source jika ada sisa kegagalan sebelumnya
+          rm -rf source
           git clone --depth=1 ${{ github.event.inputs.kernel-url }} -b ${{ github.event.inputs.kernel-branch }} source
-          cd source
-          # Fix error Kconfig techpack
+          
+      - name: Fix Techpack & Merge Config
+        run: |
+          cd $GITHUB_WORKSPACE/source
+          # Paksa hapus techpack dari Kconfig agar tidak error 'No such file'
           find . -name "Kconfig" -exec sed -i '/techpack/d' {} +
-          # Merge Config
-          scripts/kconfig/merge_config.sh ${{ github.event.inputs.base-defconfig }} ${{ github.event.inputs.device-defconfig }}
+          find . -name "Makefile" -exec sed -i '/techpack/d' {} +
+          # Buat folder out secara manual agar tidak 'Does not exist'
+          mkdir -p out
+          # Jalankan merge config
+          scripts/kconfig/merge_config.sh O=out ${{ github.event.inputs.base-defconfig }} ${{ github.event.inputs.device-defconfig }}
 
       - name: Compilation
         run: |
           cd $GITHUB_WORKSPACE/source
           export PATH=$GITHUB_WORKSPACE/toolchain/gcc64/bin:$PATH
           export PATH=$GITHUB_WORKSPACE/toolchain/gcc32/bin:$PATH
-          make -j$(nproc --all) \
-            O=out \
-            ARCH=arm64 \
+          make -j$(nproc --all) O=out ARCH=arm64 \
             CROSS_COMPILE=aarch64-elf- \
             CROSS_COMPILE_ARM32=arm-eabi- \
-            HOSTCC=gcc \
-            HOSTCXX=g++
-          
-          if [ -f out/arch/arm64/boot/Image.gz-dtb ]; then
-            echo "Kernel sukses dikompilasi!"
-          else
-            echo "Kernel gagal dikompilasi!" && exit 1
-          fi
+            HOSTCC=gcc HOSTCXX=g++
 
-      - name: Packing Kernel (AnyKernel3)
+      - name: Packing & Upload
         run: |
           cd $GITHUB_WORKSPACE
-          git clone --depth=1 https://github.com/osm0sis/AnyKernel3 AnyKernel
-          cp source/out/arch/arm64/boot/Image.gz-dtb AnyKernel/
-          cd AnyKernel
-          sed -i 's/do.devicecheck=1/do.devicecheck=0/g' anykernel.sh
-          sed -i 's/device.name1=maguro/device.name1=beryllium/g' anykernel.sh
-          zip -r9 Linex_Kernel_Beryllium.zip * -x .git README.md
-          mv *.zip $GITHUB_WORKSPACE/
+          if [ -f source/out/arch/arm64/boot/Image.gz-dtb ]; then
+            git clone --depth=1 https://github.com/osm0sis/AnyKernel3 AnyKernel
+            cp source/out/arch/arm64/boot/Image.gz-dtb AnyKernel/
+            cd AnyKernel
+            sed -i 's/do.devicecheck=1/do.devicecheck=0/g' anykernel.sh
+            sed -i 's/device.name1=maguro/device.name1=beryllium/g' anykernel.sh
+            zip -r9 Linex-Beryllium-Kernel.zip *
+            mv *.zip $GITHUB_WORKSPACE/
+          else
+            echo "Kompilasi Gagal, file tidak tercipta!" && exit 1
+          fi
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel_Beryllium_Build
+          name: Kernel_Poco_F1
           path: ./*.zip
