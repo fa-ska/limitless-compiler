@@ -18,7 +18,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest  # Pindah ke jalur cepat
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,10 +26,9 @@ jobs:
       - name: Setup Environment & Toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential bc curllibssl-dev libelf-dev flex bison rsync
+          sudo apt-get install -y build-essential bc libssl-dev libelf-dev flex bison rsync zip
           mkdir -p $GITHUB_WORKSPACE/toolchain
           cd $GITHUB_WORKSPACE/toolchain
-          # Menggunakan Eva GCC (Stabil untuk 4.19)
           git clone --depth=1 https://github.com/mvaisakh/gcc-arm64 gcc64
           git clone --depth=1 https://github.com/mvaisakh/gcc-arm gcc32
 
@@ -38,9 +37,9 @@ jobs:
           cd $GITHUB_WORKSPACE
           git clone --depth=1 ${{ github.event.inputs.kernel-url }} -b ${{ github.event.inputs.kernel-branch }} source
           cd source
-          # Hapus referensi techpack yang bikin error can't open file
+          # Fix Kconfig error
           find . -name "Kconfig" -exec sed -i '/techpack/d' {} +
-          # Gabungkan config
+          # Merge Config
           scripts/kconfig/merge_config.sh ${{ github.event.inputs.base-defconfig }} ${{ github.event.inputs.device-defconfig }}
 
       - name: Compilation
@@ -55,36 +54,26 @@ jobs:
             CROSS_COMPILE_ARM32=arm-eabi- \
             HOSTCC=gcc \
             HOSTCXX=g++
-          # Cek apakah file Image.gz-dtb berhasil dibuat
+          
           if [ -f out/arch/arm64/boot/Image.gz-dtb ]; then
-            echo "Kernel berhasil dikompilasi!"
+            echo "Kernel sukses dikompilasi!"
           else
-            echo "Kernel gagal dikompilasi, Image.gz-dtb tidak ditemukan."
-            exit 1
+            echo "Kernel gagal dikompilasi!" && exit 1
           fi
 
       - name: Packing Kernel (AnyKernel3)
         run: |
           cd $GITHUB_WORKSPACE
-          # Clone template AnyKernel3 khusus sdm845/beryllium
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3 AnyKernel
-          
-          # Salin hasil build ke folder AnyKernel
           cp source/out/arch/arm64/boot/Image.gz-dtb AnyKernel/
-          
-          # Pengaturan dasar AnyKernel3 (khusus Poco F1)
           cd AnyKernel
           sed -i 's/do.devicecheck=1/do.devicecheck=0/g' anykernel.sh
           sed -i 's/device.name1=maguro/device.name1=beryllium/g' anykernel.sh
-          
-          # Proses zipping
           zip -r9 Linex_Kernel_Beryllium.zip * -x .git README.md
-          
-          # Pindahkan hasil ke workspace untuk diupload
           mv *.zip $GITHUB_WORKSPACE/
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel_Beryllium_Result
+          name: Kernel_Beryllium_Build
           path: ./*.zip
