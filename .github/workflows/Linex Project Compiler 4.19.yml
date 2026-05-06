@@ -44,10 +44,10 @@ jobs:
           git clone --recursive --depth=1 ${{ inputs.kernel-url }} -b ${{ inputs.kernel-branch }} kernel
           cd kernel
           
-          # 2. Patching (Fix untuk GCC modern & DTC)
+          # 2. Patching (Fix DTC & Yylloc)
           sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' scripts/dtc/dtc-lexer.lex.c_shipped || true
           
-          # Matikan Techpack yang sering bikin error kompilasi
+          # Matikan Techpack
           sed -i 's/source "techpack\/Kconfig"/# /g' Kconfig || true
           sed -i 's/obj-y += techpack\// # /g' Makefile || true
 
@@ -58,21 +58,25 @@ jobs:
           
           mkdir -p out
           
-          # Gabungkan defconfig sesuai folder di screenshot 7843.png & 7845.png
+          # Gabungkan defconfig
           ARCH=arm64 ./scripts/kconfig/merge_config.sh -O out \
             arch/arm64/configs/${{ inputs.base-defconfig }} \
             arch/arm64/configs/${{ inputs.device-defconfig }}
 
-          # Fix error 7842.png (u8/bool) dengan memaksa HOSTCC=gcc
-          make O=out ARCH=arm64 CROSS_COMPILE=aarch64-elf- HOSTCC=gcc prepare -j$(nproc --all)
+          # Fix error 7846/7847: Tambahkan flag standar C dan HOSTCC
+          # Kita pakai -std=gnu11 agar compiler mengenali tipe data lama
+          make O=out ARCH=arm64 CROSS_COMPILE=aarch64-elf- \
+            HOSTCC="gcc -std=gnu11" \
+            HOSTCFLAGS="-D_GNU_SOURCE" prepare -j$(nproc --all)
           
-          # Gaspol: Gabungan flag anti-error IPA, QCOM, dan Memory
+          # Gaspol dengan tambahan flag -fcommon untuk hindari multiple definition
           make -j$(nproc --all) O=out ARCH=arm64 \
             CROSS_COMPILE=aarch64-elf- \
             CROSS_COMPILE_ARM32=arm-eabi- \
-            HOSTCC=gcc \
-            KCFLAGS="-w -fpermissive -fno-stack-protector -D_FORTIFY_SOURCE=0 -Wno-error" \
+            HOSTCC="gcc -std=gnu11" \
+            KCFLAGS="-w -fpermissive -fcommon -fno-stack-protector -D_FORTIFY_SOURCE=0 -Wno-error" \
             KCPPFLAGS="-D__ASSEMBLY__ -D_FORTIFY_SOURCE=0"
+
 
       - name: Packing
         run: |
