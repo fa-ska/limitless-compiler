@@ -44,12 +44,10 @@ jobs:
           git clone --recursive --depth=1 ${{ inputs.kernel-url }} -b ${{ inputs.kernel-branch }} kernel
           cd kernel
           
-          # 2. Patching Aman (Cek file dulu baru sed)
-          if [ -f scripts/dtc/dtc-lexer.lex.c_shipped ]; then
-            sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' scripts/dtc/dtc-lexer.lex.c_shipped
-          fi
+          # 2. Patching (Cek file agar tidak error No Such File)
+          [ -f scripts/dtc/dtc-lexer.lex.c_shipped ] && sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' scripts/dtc/dtc-lexer.lex.c_shipped || true
           
-          # Matikan Techpack secara paksa agar tidak bentrok
+          # Matikan Techpack (Sering bikin multiple definition error)
           sed -i 's/source "techpack\/Kconfig"/# /g' Kconfig || true
           sed -i 's/obj-y += techpack\// # /g' Makefile || true
 
@@ -58,34 +56,41 @@ jobs:
           export KBUILD_BUILD_USER="fa_s_ka"
           export KBUILD_BUILD_HOST="linext"
           
+          # Definisikan Toolchain
+          export CROSS_COMPILE=aarch64-elf-
+          export CROSS_COMPILE_ARM32=arm-eabi-
+          
           mkdir -p out
           
-          # Gunakan merge_config sesuai folder di 7824.png dan 7826.png
+          # Gabungkan defconfig (beryllium_defconfig + vendor config)
           ARCH=arm64 ./scripts/kconfig/merge_config.sh -O out \
             arch/arm64/configs/${{ inputs.base-defconfig }} \
             arch/arm64/configs/${{ inputs.device-defconfig }}
 
-          # Fix Error 7849 (Atomic) & 7850: Tambahkan -fno-integrated-as dan standar gnu89
-          make O=out ARCH=arm64 CROSS_COMPILE=aarch64-elf- HOSTCC="gcc -std=gnu11" prepare -j$(nproc --all)
-          
-          # Gaspol dengan KCFLAGS yang lebih kuat
-          make -j$(nproc --all) O=out ARCH=arm64 \
-            CROSS_COMPILE=aarch64-elf- \
-            CROSS_COMPILE_ARM32=arm-eabi- \
+          # Fix u8 & Atomic: Gunakan gnu89 + Define ARM ARCH v8
+          make O=out ARCH=arm64 CROSS_COMPILE=$CROSS_COMPILE \
             HOSTCC="gcc -std=gnu11" \
-            KCFLAGS="-w -fpermissive -fcommon -fno-stack-protector -D_FORTIFY_SOURCE=0 -Wno-error -std=gnu89" \
+            KCFLAGS="-std=gnu89 -D__LINUX_ARM_ARCH__=8" prepare -j$(nproc --all)
+          
+          # Build Utama: Force CC & LD agar tidak pakai Clang bawaan runner
+          make -j$(nproc --all) O=out ARCH=arm64 \
+            CROSS_COMPILE=$CROSS_COMPILE \
+            CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 \
+            HOSTCC="gcc -std=gnu11" \
+            CC="${CROSS_COMPILE}gcc" \
+            LD="${CROSS_COMPILE}ld" \
+            KCFLAGS="-w -fpermissive -fcommon -fno-stack-protector -std=gnu89 -D__LINUX_ARM_ARCH__=8 -D_FORTIFY_SOURCE=0 -Wno-error" \
             KCPPFLAGS="-D__ASSEMBLY__ -D_FORTIFY_SOURCE=0"
-
 
       - name: Packing
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3 AnyKernel3
-          # Ambil semua Image yang berhasil dibuat
+          # Copy hasil build yang ada di out/
           find kernel/out/arch/arm64/boot/ -name "Image*" -exec cp {} AnyKernel3/ \;
           [ -f kernel/out/arch/arm64/boot/dtbo.img ] && cp kernel/out/arch/arm64/boot/dtbo.img AnyKernel3/
 
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: upload-artifact@v4
         with:
           name: ${{ inputs.name }}
           path: AnyKernel3/*
