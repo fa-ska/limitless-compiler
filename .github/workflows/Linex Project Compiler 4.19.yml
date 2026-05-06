@@ -36,43 +36,46 @@ jobs:
       - name: Toolchain Setup
         run: |
           mkdir -p $HOME/toolchain
+          # Pakai Eva GCC modern untuk Snapdragon 845
           curl -LSs "https://github.com/mvaisakh/gcc-arm64/archive/refs/heads/master.tar.gz" | tar -C $HOME/toolchain --strip-components=1 -xz
 
       - name: Source, Patching & Compilation
         run: |
-          # 1. Ambil Source
+          # 1. Clone Source
           git clone --recursive --depth=1 ${{ inputs.kernel-url }} -b ${{ inputs.kernel-branch }} kernel
           cd kernel
           
-          # 2. Patching (Cek file agar tidak error No Such File)
-          [ -f scripts/dtc/dtc-lexer.lex.c_shipped ] && sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' scripts/dtc/dtc-lexer.lex.c_shipped || true
+          # 2. Patching (Fix DTC & Techpack)
+          # Gunakan pengecekan file agar tidak error 'No such file' seperti di 7850.png
+          if [ -f scripts/dtc/dtc-lexer.lex.c_shipped ]; then
+            sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' scripts/dtc/dtc-lexer.lex.c_shipped
+          fi
           
-          # Matikan Techpack (Sering bikin multiple definition error)
+          # Matikan Techpack secara paksa (sering bikin error multiple definition)
           sed -i 's/source "techpack\/Kconfig"/# /g' Kconfig || true
           sed -i 's/obj-y += techpack\// # /g' Makefile || true
 
-          # 3. Masak Kernel
+          # 3. Setup Build Environment
           export PATH="$HOME/toolchain/bin:$PATH"
           export KBUILD_BUILD_USER="fa_s_ka"
           export KBUILD_BUILD_HOST="linext"
-          
-          # Definisikan Toolchain
           export CROSS_COMPILE=aarch64-elf-
           export CROSS_COMPILE_ARM32=arm-eabi-
           
           mkdir -p out
           
-          # Gabungkan defconfig (beryllium_defconfig + vendor config)
+          # Gabungkan defconfig (beryllium + vendor config)
           ARCH=arm64 ./scripts/kconfig/merge_config.sh -O out \
             arch/arm64/configs/${{ inputs.base-defconfig }} \
             arch/arm64/configs/${{ inputs.device-defconfig }}
 
-          # Fix u8 & Atomic: Gunakan gnu89 + Define ARM ARCH v8
+          # 4. Eksekusi Kompilasi
+          # Fix error 7872: Gunakan gnu89 dan paksa definisi arsitektur v8
           make O=out ARCH=arm64 CROSS_COMPILE=$CROSS_COMPILE \
             HOSTCC="gcc -std=gnu11" \
             KCFLAGS="-std=gnu89 -D__LINUX_ARM_ARCH__=8" prepare -j$(nproc --all)
           
-          # Build Utama: Force CC & LD agar tidak pakai Clang bawaan runner
+          # Build Utama dengan perlindungan terhadap unknown type names
           make -j$(nproc --all) O=out ARCH=arm64 \
             CROSS_COMPILE=$CROSS_COMPILE \
             CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 \
@@ -85,11 +88,10 @@ jobs:
       - name: Packing
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3 AnyKernel3
-          # Copy hasil build yang ada di out/
           find kernel/out/arch/arm64/boot/ -name "Image*" -exec cp {} AnyKernel3/ \;
           [ -f kernel/out/arch/arm64/boot/dtbo.img ] && cp kernel/out/arch/arm64/boot/dtbo.img AnyKernel3/
 
-      - name: Upload
+      - name: Upload Artifact
         uses: upload-artifact@v4
         with:
           name: ${{ inputs.name }}
