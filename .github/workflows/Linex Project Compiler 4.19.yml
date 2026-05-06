@@ -15,7 +15,7 @@ on:
         description: 'Base Defconfig'
         default: 'beryllium_defconfig'
       device-defconfig:
-        description: 'Device Config'
+        description: 'Device Config (Vendor)'
         default: 'vendor/xiaomi/beryllium.config'
 
 jobs:
@@ -44,10 +44,10 @@ jobs:
           git clone --recursive --depth=1 ${{ inputs.kernel-url }} -b ${{ inputs.kernel-branch }} kernel
           cd kernel
           
-          # 2. Patching (Fix untuk GCC 10+)
+          # 2. Patching (Fix untuk GCC modern & DTC)
           sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' scripts/dtc/dtc-lexer.lex.c_shipped || true
           
-          # Matikan Techpack agar tidak error di tengah jalan
+          # Matikan Techpack yang sering bikin error kompilasi
           sed -i 's/source "techpack\/Kconfig"/# /g' Kconfig || true
           sed -i 's/obj-y += techpack\// # /g' Makefile || true
 
@@ -58,25 +58,26 @@ jobs:
           
           mkdir -p out
           
-          # Gabungkan config sesuai struktur di 7824.png dan 7826.png
+          # Gabungkan defconfig sesuai folder di screenshot 7843.png & 7845.png
           ARCH=arm64 ./scripts/kconfig/merge_config.sh -O out \
             arch/arm64/configs/${{ inputs.base-defconfig }} \
             arch/arm64/configs/${{ inputs.device-defconfig }}
 
-          # Pondasi: Buat header dulu secara antre (-j1) untuk hindari error 7742.png
-          make O=out ARCH=arm64 CROSS_COMPILE=aarch64-elf- prepare -j1
+          # Fix error 7842.png (u8/bool) dengan memaksa HOSTCC=gcc
+          make O=out ARCH=arm64 CROSS_COMPILE=aarch64-elf- HOSTCC=gcc prepare -j$(nproc --all)
           
-          # Gaspol: Pakai semua bumbu anti-error IPA, QCOM, dan Memory
+          # Gaspol: Gabungan flag anti-error IPA, QCOM, dan Memory
           make -j$(nproc --all) O=out ARCH=arm64 \
             CROSS_COMPILE=aarch64-elf- \
             CROSS_COMPILE_ARM32=arm-eabi- \
+            HOSTCC=gcc \
             KCFLAGS="-w -fpermissive -fno-stack-protector -D_FORTIFY_SOURCE=0 -Wno-error" \
             KCPPFLAGS="-D__ASSEMBLY__ -D_FORTIFY_SOURCE=0"
 
       - name: Packing
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3 AnyKernel3
-          # Cari hasil Image di folder out
+          # Ambil semua Image yang berhasil dibuat
           find kernel/out/arch/arm64/boot/ -name "Image*" -exec cp {} AnyKernel3/ \;
           [ -f kernel/out/arch/arm64/boot/dtbo.img ] && cp kernel/out/arch/arm64/boot/dtbo.img AnyKernel3/
 
