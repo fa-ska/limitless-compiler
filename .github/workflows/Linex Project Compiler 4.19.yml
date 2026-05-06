@@ -70,12 +70,13 @@ jobs:
             arch/arm64/configs/${{ inputs.device-defconfig }}
 
           # 4. Eksekusi Kompilasi
-          # Fix error 7872: Gunakan gnu89 dan paksa definisi arsitektur v8
+          # 4. Eksekusi Kompilasi
+          # Fix error 7872: Gunakan gnu89 dan paksa v8
           make O=out ARCH=arm64 CROSS_COMPILE=$CROSS_COMPILE \
             HOSTCC="gcc -std=gnu11" \
             KCFLAGS="-std=gnu89 -D__LINUX_ARM_ARCH__=8" prepare -j$(nproc --all)
           
-          # Build Utama dengan perlindungan terhadap unknown type names
+          # Build Utama
           make -j$(nproc --all) O=out ARCH=arm64 \
             CROSS_COMPILE=$CROSS_COMPILE \
             CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 \
@@ -85,6 +86,7 @@ jobs:
             KCFLAGS="-w -fpermissive -fcommon -fno-stack-protector -std=gnu89 -D__LINUX_ARM_ARCH__=8 -D_FORTIFY_SOURCE=0 -Wno-error" \
             KCPPFLAGS="-D__ASSEMBLY__ -D_FORTIFY_SOURCE=0"
 
+
       - name: Packing
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3 AnyKernel3
@@ -92,7 +94,8 @@ jobs:
           [ -f kernel/out/arch/arm64/boot/dtbo.img ] && cp kernel/out/arch/arm64/boot/dtbo.img AnyKernel3/
 
       - name: Upload Artifact
-        uses: upload-artifact@v4
+        uses: actions/upload-artifact@v4  # <-- Tambahkan 'actions/' di sini!
         with:
           name: ${{ inputs.name }}
           path: AnyKernel3/*
+
