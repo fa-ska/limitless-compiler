@@ -1,97 +1,57 @@
-name: Linex Project 4.19 Final Green
+name: Linex Project 4.19 Optimized
 
 on:
   workflow_dispatch:
     inputs:
-      kernel_url:
+      kernel-url:
         description: 'URL Repo Kernel'
-        required: true
         default: 'https://github.com/fa-ska/4.19_android_kernel_xiaomi_sdm845'
-      kernel_branch:
-        description: 'Branch Kernel'
-        required: true
+      kernel-branch:
+        description: 'Branch'
         default: 'rebase'
-      base_defconfig:
+      base-defconfig:
         description: 'Base Defconfig'
-        required: true
         default: 'sdm845-perf_defconfig'
-      device_defconfig:
+      device-defconfig:
         description: 'Device Config'
-        required: true
         default: 'vendor/xiaomi/beryllium.config'
-      build_name:
-        description: 'Nama Hasil Build'
-        required: true
-        default: '4.19_beryllium_final_green'
 
 jobs:
   build:
-    # Menggunakan Ubuntu 20.04 untuk menghindari konflik linker modern (glibc)
-    runs-on: ubuntu-20.04 
+    runs-on: ubuntu-latest  # Pindah ke jalur cepat
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Environment Setup
+      - name: Setup Environment & Toolchain
         run: |
-          sudo apt-get update && sudo apt-get install -y --no-install-recommends \
-          bc bison build-essential curl flex git libssl-dev libxml2-utils lzop make zip zstd \
-          python3 ca-certificates device-tree-compiler rsync libelf-dev wget
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc curllibssl-dev libelf-dev flex bison rsync
+          mkdir -p $GITHUB_WORKSPACE/toolchain
+          cd $GITHUB_WORKSPACE/toolchain
+          # Menggunakan Eva GCC (Stabil untuk 4.19)
+          git clone --depth=1 https://github.com/mvaisakh/gcc-arm64 gcc64
+          git clone --depth=1 https://github.com/mvaisakh/gcc-arm gcc32
 
-      - name: Setup Eva GCC
+      - name: Clean Techpack & Prepare Source
         run: |
-          # Eva GCC adalah toolchain paling stabil untuk kernel sdm845 legacy
-          mkdir -p $HOME/gcc64 $HOME/gcc32
-          curl -LSs "https://github.com/mvaisakh/gcc-arm64/archive/refs/heads/master.tar.gz" | tar -C $HOME/gcc64 --strip-components=1 -xz
-          curl -LSs "https://github.com/mvaisakh/gcc-arm/archive/refs/heads/master.tar.gz" | tar -C $HOME/gcc32 --strip-components=1 -xz
+          cd $GITHUB_WORKSPACE
+          git clone --depth=1 ${{ github.event.inputs.kernel-url }} -b ${{ github.event.inputs.kernel-branch }} source
+          cd source
+          # Hapus referensi techpack yang bikin error can't open file
+          find . -name "Kconfig" -exec sed -i '/techpack/d' {} +
+          # Gabungkan config
+          scripts/kconfig/merge_config.sh ${{ github.event.inputs.base-defconfig }} ${{ github.event.inputs.device-defconfig }}
 
-      - name: Build Kernel
+      - name: Compilation
         run: |
-          # 1. Clone Source sesuai input
-          git clone --depth=1 ${{ github.event.inputs.kernel_url }} -b ${{ github.event.inputs.kernel_branch }} kernel
-          cd kernel
-          
-          # 2. Patching & Cleanup Techpack (Penyebab error syncconfig sebelumnya)
-          curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
-          find . -type f \( -name "Kconfig" -o -name "Makefile" \) -exec sed -i '/techpack/d' {} +
-          [ -f scripts/dtc/dtc-lexer.lex.c_shipped ] && sed -i 's/^YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' scripts/dtc/dtc-lexer.lex.c_shipped || true
-
-          # 3. Setup Path & Variables
-          export PATH="$HOME/gcc64/bin:$HOME/gcc32/bin:$PATH"
-          export ARCH=arm64
-          export KBUILD_BUILD_USER="fa_s_ka"
-          export KBUILD_BUILD_HOST="linext"
-          
-          ARGS=(
-            ARCH=arm64
-            O=out
-            CROSS_COMPILE=aarch64-elf-
-            CROSS_COMPILE_ARM32=arm-eabi-
-          )
-
-          # 4. Proses Kompilasi
-          mkdir -p out
-          ./scripts/kconfig/merge_config.sh -O out \
-            arch/arm64/configs/${{ github.event.inputs.base_defconfig }} \
-            arch/arm64/configs/${{ github.event.inputs.device_defconfig }}
-          
-          make "${ARGS[@]}" oldconfig
-          make -j$(nproc --all) "${ARGS[@]}"
-
-      - name: Package AnyKernel3
-        run: |
-          git clone --depth=1 https://github.com/osm0sis/AnyKernel3 AnyKernel3
-          # Mencari file Image hasil build secara dinamis
-          for f in kernel/out/arch/arm64/boot/Image.gz-dtb kernel/out/arch/arm64/boot/Image.gz kernel/out/arch/arm64/boot/Image; do
-            if [ -f "$f" ]; then
-              cp "$f" AnyKernel3/
-              echo "Kernel image found: $f"
-              break
-            fi
-          done
-          [ -f kernel/out/arch/arm64/boot/dtbo.img ] && cp kernel/out/arch/arm64/boot/dtbo.img AnyKernel3/
-          
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ github.event.inputs.build_name }}
-          path: AnyKernel3/*
+          cd $GITHUB_WORKSPACE/source
+          export PATH=$GITHUB_WORKSPACE/toolchain/gcc64/bin:$PATH
+          export PATH=$GITHUB_WORKSPACE/toolchain/gcc32/bin:$PATH
+          make -j$(nproc --all) \
+            O=out \
+            ARCH=arm64 \
+            CROSS_COMPILE=aarch64-elf- \
+            CROSS_COMPILE_ARM32=arm-eabi- \
+            HOSTCC=gcc \
+            HOSTCXX=g++
