@@ -1,0 +1,93 @@
+name: Linex Kernel Compiler (Ubuntu Clang)
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_repo:
+        description: 'URL Repository Kernel'
+        required: true
+        default: 'https://github.com/ThRE-Team/android_kernel_xiaomi_sdm845_419'
+      kernel_branch:
+        description: 'Brankas Kernel (Branch)'
+        required: true
+        default: 'lineage-23.2_xiaomi'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Workflow
+        uses: actions/checkout@v4
+
+      - name: Install Build Essentials
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            bc build-essential flex bison lld clang llvm \
+            libssl-dev libelf-dev cpio libncurses-dev git-core \
+            wget python3 gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi
+
+      - name: Clone Kernel Source
+        run: |
+          # Melakukan clone berdasarkan input repo dan brankas yang dipilih
+          git clone --depth=1 "${{ github.event.inputs.kernel_repo }}" -b "${{ github.event.inputs.kernel_branch }}" kernel-source
+          
+      - name: Compile Kernel
+        working-directory: kernel-source
+        run: |
+          # ===== BUILD INFO =====
+          export KBUILD_BUILD_USER="fa_s_ka"
+          export KBUILD_BUILD_HOST="linex"
+          
+          # ===== VARS =====
+          OUT_DIR="out"
+          DEFCONFIG="vendor/sdm845-perf_defconfig"
+          FRAG1="arch/arm64/configs/vendor/xiaomi/sdm845-common.config"
+          FRAG2="arch/arm64/configs/vendor/xiaomi/beryllium.config"
+          
+          MAKE_ARGS=(
+            O=$OUT_DIR
+            ARCH=arm64
+            CC=clang
+            HOSTCC=clang
+            HOSTCXX=clang++
+            LD=ld.lld
+            AR=llvm-ar
+            NM=llvm-nm
+            OBJCOPY=llvm-objcopy
+            OBJDUMP=llvm-objdump
+            STRIP=llvm-strip
+            READELF=llvm-readelf
+            CLANG_TRIPLE=aarch64-linux-gnu-
+            CROSS_COMPILE=aarch64-linux-gnu-
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+            LLVM=1
+            LLVM_IAS=1
+          )
+
+          mkdir -p $OUT_DIR
+          
+          echo "Step 1: Loading base defconfig..."
+          make "${MAKE_ARGS[@]}" $DEFCONFIG
+
+          echo "Step 2: Merging fragments for Beryllium..."
+          if [ -f "$FRAG1" ] && [ -f "$FRAG2" ]; then
+            ./scripts/kconfig/merge_config.sh -m -O $OUT_DIR $OUT_DIR/.config $FRAG1 $FRAG2
+          else
+            echo "Warning: Fragments not found, skipping merge."
+          fi
+
+          echo "Step 3: Updating config..."
+          make "${MAKE_ARGS[@]}" olddefconfig
+
+          echo "Step 4: Compiling..."
+          make -j$(nproc --all) "${MAKE_ARGS[@]}"
+
+      - name: Upload Artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kernel-Beryllium-${{ github.event.inputs.kernel_branch }}
+          path: |
+            kernel-source/out/arch/arm64/boot/Image.gz-dtb
+            kernel-source/out/arch/arm64/boot/dtbo.img
