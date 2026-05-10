@@ -5,11 +5,11 @@ on:
       kernel_repo:
         description: 'URL Repository Kernel'
         required: true
-        default: https://github.com/fa-ska/4.19_android_kernel_xiaomi_sdm845'
+        default: 'https://github.com/ThRE-Team/android_kernel_xiaomi_sdm845_419'
       kernel_branch:
         description: 'Brankas Kernel (Branch)'
         required: true
-        default: 'rebase'
+        default: 'lineage-23.2_xiaomi'
       base-defconfig:
         description: 'Base Defconfig'
         required: true
